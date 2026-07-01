@@ -51,7 +51,7 @@ export default function App() {
 
   const [newCharacterName, setNewCharacterName] = useState("");
   const [newCharacterClass, setNewCharacterClass] =
-    useState<DaggerheartClassKey>("seraph");
+    useState<DaggerheartClassKey>("sorcerer");
   const [newCharacterSystem, setNewCharacterSystem] =
     useState<CharacterSystem>("daggerheart");
 
