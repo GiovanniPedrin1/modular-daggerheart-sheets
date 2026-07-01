@@ -32,7 +32,7 @@
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "no-cache"
+          "value": "no-cache, must-revalidate"
         }
       ]
     },
@@ -42,15 +42,6 @@
         {
           "key": "Cache-Control",
           "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
-      "source": "/app-version.json",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-cache, no-store, must-revalidate"
         }
       ]
     }
