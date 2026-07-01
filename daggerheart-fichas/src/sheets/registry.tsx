@@ -2,7 +2,8 @@ import { DaggerheartSheet } from "./daggerheart/DaggerheartSheet";
 import { daggerheartClasses } from "./daggerheart/data/shared";
 import { daggerheartTexts } from "./daggerheart/i18n";
 import type { DaggerheartClassKey, Language } from "./daggerheart/types";
-import type { SerializedSheetData } from "./daggerheart/utils/formData";
+import type { DaggerheartCharacterData, SerializedSheetData } from "./daggerheart/utils/formData";
+import { extractSheetFields } from "./daggerheart/utils/formData";
 
 type Character = {
   id: string;
@@ -10,7 +11,7 @@ type Character = {
   system: string;
   createdAt: string;
   class?: string;
-  data?: SerializedSheetData["fields"];
+  data?: DaggerheartCharacterData;
 };
 
 type SheetRendererProps = {
@@ -53,7 +54,7 @@ export function SheetRenderer({
         character={character}
         language={language}
         definition={daggerheartClasses[character.class]}
-        initialData={character.data ?? {}}
+        initialData={extractSheetFields(character.data)}
         saveStatusLabel={saveStatusLabel}
         saveStatusKind={saveStatusKind}
         onSheetDataChange={onSheetDataChange}

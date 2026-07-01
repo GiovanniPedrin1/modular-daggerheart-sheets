@@ -7,7 +7,7 @@ import {
   type CharacterSystem,
 } from "../db/localDb";
 import type { DaggerheartClassKey, Language } from "../sheets/daggerheart/types";
-import type { SerializedSheetData } from "../sheets/daggerheart/utils/formData";
+import type { DaggerheartCharacterData } from "../sheets/daggerheart/utils/formData";
 
 export type { CharacterRecord, CharacterSystem };
 
@@ -28,7 +28,7 @@ export function createCharacter(input: CreateCharacterInput) {
 
 export function saveCharacterSheetData(
   characterId: string,
-  data: SerializedSheetData["fields"],
+  data: DaggerheartCharacterData,
   patch?: Partial<Pick<CharacterRecord, "name" | "language" | "class" | "system">>
 ) {
   return saveCharacterData(characterId, data, patch);

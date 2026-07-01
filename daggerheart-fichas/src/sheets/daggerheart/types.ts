@@ -125,6 +125,34 @@ export type DaggerheartClassDefinition = {
   startingExperiencePlaceholder?: LocalizedString;
 };
 
+
+export type DaggerheartDetailsPage = {
+  physical: {
+    age: string;
+    height: string;
+    weight: string;
+    other: string;
+    eyes: string;
+    body: string;
+    hair: string;
+  };
+  domainCards: string;
+  abilities: {
+    ancestry: {
+      first: string;
+      second: string;
+    };
+    community: string;
+    foundation: {
+      castingAttribute: string;
+      text: string;
+    };
+    specialization: string;
+    mastery: string;
+  };
+  story: string;
+};
+
 export type DaggerheartTexts = {
   invalidClassMessage: string;
   customSheetTitle: string;

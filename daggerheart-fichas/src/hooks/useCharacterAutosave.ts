@@ -3,19 +3,23 @@ import {
   saveCharacterSheetData,
   type CharacterRecord,
 } from "../services/characterService";
-import type { SerializedSheetData } from "../sheets/daggerheart/utils/formData";
+import {
+  mergeSheetFieldsIntoDaggerheartData,
+  type DaggerheartCharacterData,
+  type SerializedSheetData,
+} from "../sheets/daggerheart/utils/formData";
 
 export type SaveStatus = "idle" | "editing" | "saving" | "saved" | "error";
 
 export type OptimisticCharacterChange = {
   name: string;
-  data: SerializedSheetData["fields"];
+  data: DaggerheartCharacterData;
   updatedAt: string;
 };
 
 type PendingAutosave = {
   characterId: string;
-  data: SerializedSheetData["fields"];
+  data: DaggerheartCharacterData;
   name: string;
   requestId: number;
   snapshot: string;
@@ -167,7 +171,7 @@ export function useCharacterAutosave({
 
   function buildAutosaveSnapshot(
     name: string,
-    data: SerializedSheetData["fields"]
+    data: DaggerheartCharacterData
   ) {
     return JSON.stringify({ name, data });
   }
@@ -297,7 +301,11 @@ export function useCharacterAutosave({
       typeof data.char_name === "string" && data.char_name.trim()
         ? data.char_name.trim()
         : currentCharacter.name;
-    const snapshot = buildAutosaveSnapshot(nextName, data);
+    const nextData = mergeSheetFieldsIntoDaggerheartData(
+      currentCharacter.data,
+      data
+    );
+    const snapshot = buildAutosaveSnapshot(nextName, nextData);
 
     if (latestObservedSnapshotRef.current.get(characterId) === snapshot) {
       return;
@@ -314,13 +322,13 @@ export function useCharacterAutosave({
 
     onOptimisticCharacterChangeRef.current(characterId, {
       name: nextName,
-      data,
+      data: nextData,
       updatedAt: new Date().toISOString(),
     });
 
     scheduleAutosave({
       characterId,
-      data,
+      data: nextData,
       name: nextName,
       requestId,
       snapshot,

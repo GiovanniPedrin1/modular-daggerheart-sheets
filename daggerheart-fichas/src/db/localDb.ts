@@ -1,6 +1,6 @@
 import Dexie, { type Table } from "dexie";
 import type { DaggerheartClassKey, Language } from "../sheets/daggerheart/types";
-import type { SerializedSheetData } from "../sheets/daggerheart/utils/formData";
+import type { DaggerheartCharacterData } from "../sheets/daggerheart/utils/formData";
 
 export type CharacterSystem = "daggerheart" | "custom";
 
@@ -10,7 +10,7 @@ export type CharacterRecord = {
   system: CharacterSystem;
   class?: DaggerheartClassKey;
   language: Language;
-  data: SerializedSheetData["fields"];
+  data: DaggerheartCharacterData;
   createdAt: string;
   updatedAt: string;
   deletedAt?: string;
@@ -88,7 +88,7 @@ export async function createCharacter(input: {
 
 export async function saveCharacterData(
   characterId: string,
-  data: SerializedSheetData["fields"],
+  data: DaggerheartCharacterData,
   patch?: Partial<Pick<CharacterRecord, "name" | "language" | "class" | "system">>
 ) {
   return db.transaction("rw", db.characters, async () => {

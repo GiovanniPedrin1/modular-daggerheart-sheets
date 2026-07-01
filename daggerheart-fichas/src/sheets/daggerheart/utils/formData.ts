@@ -1,8 +1,80 @@
+import type { DaggerheartDetailsPage } from "../types";
+import { normalizeDetailsPage } from "./detailsPage";
+
 export type SheetFieldValue = string | boolean;
+export type SheetFormFields = Record<string, SheetFieldValue>;
+
+export type DaggerheartCharacterData = Record<
+  string,
+  SheetFieldValue | DaggerheartDetailsPage | undefined
+> & {
+  detailsPage?: DaggerheartDetailsPage;
+};
 
 export type SerializedSheetData = {
-  fields: Record<string, SheetFieldValue>;
+  fields: SheetFormFields;
 };
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isSheetFieldValue(value: unknown): value is SheetFieldValue {
+  return typeof value === "string" || typeof value === "boolean";
+}
+
+export function extractSheetFields(data?: unknown): SheetFormFields {
+  if (!isPlainObject(data)) {
+    return {};
+  }
+
+  const fields: SheetFormFields = {};
+
+  for (const [key, value] of Object.entries(data)) {
+    if (key === "detailsPage") continue;
+
+    if (isSheetFieldValue(value)) {
+      fields[key] = value;
+    }
+  }
+
+  return fields;
+}
+
+export function normalizeDaggerheartCharacterData(
+  data: unknown,
+  options: { includeEmptyDetailsPage?: boolean } = {}
+): DaggerheartCharacterData {
+  const fields = extractSheetFields(data);
+  const normalized: DaggerheartCharacterData = { ...fields };
+
+  if (
+    options.includeEmptyDetailsPage ||
+    (isPlainObject(data) && Object.prototype.hasOwnProperty.call(data, "detailsPage"))
+  ) {
+    normalized.detailsPage = normalizeDetailsPage(
+      isPlainObject(data) ? data.detailsPage : undefined
+    );
+  }
+
+  return normalized;
+}
+
+export function mergeSheetFieldsIntoDaggerheartData(
+  currentData: unknown,
+  nextFields: SheetFormFields
+): DaggerheartCharacterData {
+  const nextData: DaggerheartCharacterData = { ...nextFields };
+
+  if (
+    isPlainObject(currentData) &&
+    Object.prototype.hasOwnProperty.call(currentData, "detailsPage")
+  ) {
+    nextData.detailsPage = normalizeDetailsPage(currentData.detailsPage);
+  }
+
+  return nextData;
+}
 
 function getSheetFields(form: HTMLFormElement) {
   return Array.from(

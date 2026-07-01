@@ -1,6 +1,8 @@
 import { db, type CharacterRecord, type CharacterSystem, type SettingRecord } from "../db/localDb";
 import type { DaggerheartClassKey, Language } from "../sheets/daggerheart/types";
-import type { SerializedSheetData } from "../sheets/daggerheart/utils/formData";
+import {
+  normalizeDaggerheartCharacterData,
+} from "../sheets/daggerheart/utils/formData";
 
 export type BackupFile = {
   app: "rpg-sheets-local-first";
@@ -122,7 +124,7 @@ function parseCharacterRecord(value: unknown): CharacterRecord {
     typeof value.name !== "string" ||
     !isCharacterSystem(value.system) ||
     !isLanguage(value.language) ||
-    !isSheetData(value.data) ||
+    !isPlainObject(value.data) ||
     typeof value.createdAt !== "string" ||
     typeof value.updatedAt !== "string"
   ) {
@@ -134,7 +136,7 @@ function parseCharacterRecord(value: unknown): CharacterRecord {
     name: value.name,
     system: value.system,
     language: value.language,
-    data: value.data,
+    data: normalizeDaggerheartCharacterData(value.data),
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
     version: typeof value.version === "number" ? value.version : 1,
@@ -187,15 +189,4 @@ function isDaggerheartClassKey(value: string): value is DaggerheartClassKey {
     "warrior",
     "wizard",
   ].includes(value);
-}
-
-function isSheetData(value: unknown): value is SerializedSheetData["fields"] {
-  if (!isPlainObject(value)) {
-    return false;
-  }
-
-  return Object.values(value).every(
-    (fieldValue) =>
-      typeof fieldValue === "string" || typeof fieldValue === "boolean"
-  );
 }
