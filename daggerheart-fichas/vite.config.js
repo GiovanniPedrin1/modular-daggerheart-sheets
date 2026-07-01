@@ -7,8 +7,11 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: 'injectManifest',
       registerType: 'autoUpdate',
-      injectRegister: 'auto',
+      injectRegister: null,
+      srcDir: 'src',
+      filename: 'sw.js',
       includeAssets: ['favicon.svg', 'pwa-192x192.png', 'pwa-512x512.png'],
       manifest: {
         name: 'Daggerheart Fichas',
@@ -42,11 +45,8 @@ export default defineConfig({
           },
         ],
       },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,json,webmanifest}'],
-        navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//, /\/[^/?]+\.[^/]+$/],
-        cleanupOutdatedCaches: true,
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,ico,png,svg,json,webmanifest}'],
       },
     }),
   ],
