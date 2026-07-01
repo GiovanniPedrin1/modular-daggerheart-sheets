@@ -834,7 +834,7 @@ textarea.dh-companion-image-box {
 .dh-tabs {
   display: flex;
   gap: 8px;
-  padding: 0 18px 16px;
+  padding: 16px 18px 16px;
   border-bottom: 1px solid var(--dh-line);
   background: var(--dh-paper);
 }
