@@ -34,22 +34,22 @@ export const daggerheartTexts: Record<"pt-BR" | "en-US", DaggerheartTexts> = {
     marks2Hp: "Marca 2 PV",
     marks3Hp: "Marca 3 PV",
     hp: "PV",
-    stress: "Stress",
+    stress: "Estresse",
 
-    hope: "Hope",
-    hopeHint: "Gaste Hope para usar uma experiência ou ajudar um aliado.",
+    hope: "Esperança",
+    hopeHint: "Gaste Esperança para usar uma experiência ou ajudar um aliado.",
     lifeSupport: "Life Support",
     lifeSupportText:
-      "Gaste 3 Hope para limpar um Ponto de Vida de um aliado dentro de alcance Close.",
+      "Gaste 3 Esperança para limpar um Ponto de Vida de um aliado dentro de alcance Close.",
 
     experiences: "Experiências",
     experience: "Experiência",
     bonus: "Bônus",
 
     gold: "Ouro",
-    handfuls: "Handfuls",
-    bags: "Bags",
-    chest: "Chest",
+    handfuls: "Punhados",
+    bags: "Sacos",
+    chest: "Baús",
 
     classFeature: "Feature da Classe",
     featureName: "Nome",
@@ -150,7 +150,7 @@ export const daggerheartTexts: Record<"pt-BR" | "en-US", DaggerheartTexts> = {
     training: "Treinamento",
     companionStress: "Stress do companheiro",
     trainingMarks: "Marcas",
-    hopeSlot: "Slot de Hope",
+    hopeSlot: "Slot de Esperança",
 
     printNote:
       "Ficha modular para Daggerheart. Dados e cache ficam por conta da camada externa do app.",
