@@ -830,6 +830,96 @@ textarea.dh-companion-image-box {
   min-height: 232px;
 }
 
+
+.dh-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 0 18px 16px;
+  border-bottom: 1px solid var(--dh-line);
+  background: var(--dh-paper);
+}
+
+.dh-tab {
+  border: 1px solid var(--dh-line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--dh-brand);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  padding: 9px 14px;
+  text-transform: uppercase;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.dh-tab:hover,
+.dh-tab:focus-visible {
+  border-color: var(--dh-brand-2);
+  outline: none;
+}
+
+.dh-tab.is-active {
+  background: var(--dh-brand);
+  border-color: var(--dh-brand);
+  color: #ffffff;
+}
+
+
+.dh-details-tab {
+  align-items: stretch;
+}
+
+.dh-details-physical-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.dh-details-main-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.9fr) minmax(420px, 1.1fr);
+  gap: var(--dh-gap);
+  align-items: start;
+}
+
+.dh-details-subsection {
+  display: grid;
+  gap: 10px;
+}
+
+.dh-details-subsection h3 {
+  margin: 0;
+  color: var(--dh-brand);
+  font-size: 0.95rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.dh-details-foundation-grid {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.35fr) minmax(280px, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.dh-details-tall-textarea {
+  min-height: 260px;
+}
+
+.dh-details-medium-textarea {
+  min-height: 130px;
+}
+
+.dh-details-story-textarea {
+  min-height: 220px;
+}
+
 @media (max-width: 1040px) {
   .dh-hero {
     grid-template-columns: 1fr;
@@ -851,6 +941,8 @@ textarea.dh-companion-image-box {
   }
 
   .dh-grid-2,
+  .dh-details-main-grid,
+  .dh-details-foundation-grid,
   .dh-guide-intro,
   .dh-questions,
   .dh-tiers,
@@ -874,7 +966,17 @@ textarea.dh-companion-image-box {
     padding: 10px;
   }
 
+  .dh-tabs {
+    flex-wrap: wrap;
+    padding-inline: 10px;
+  }
+
+  .dh-tab {
+    flex: 1 1 150px;
+  }
+
   .dh-identity,
+  .dh-details-physical-grid,
   .dh-field-row,
   .dh-field-row.dh-three,
   .dh-metric-strip,
@@ -941,5 +1043,14 @@ textarea.dh-companion-image-box {
 
   .dh-content {
     padding: 10px;
+  }
+
+  .dh-tabs {
+    flex-wrap: wrap;
+    padding-inline: 10px;
+  }
+
+  .dh-tab {
+    flex: 1 1 150px;
   }
 }

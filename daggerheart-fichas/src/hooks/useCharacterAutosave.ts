@@ -6,7 +6,6 @@ import {
 import {
   mergeSheetFieldsIntoDaggerheartData,
   type DaggerheartCharacterData,
-  type SerializedSheetData,
 } from "../sheets/daggerheart/utils/formData";
 
 export type SaveStatus = "idle" | "editing" | "saving" | "saved" | "error";
@@ -291,7 +290,7 @@ export function useCharacterAutosave({
     latestObservedSnapshotRef.current.clear();
   }
 
-  function handleSheetDataChange(data: SerializedSheetData["fields"]) {
+  function handleSheetDataChange(data: DaggerheartCharacterData) {
     const currentCharacter = selectedCharacterRef.current;
 
     if (!currentCharacter) return;

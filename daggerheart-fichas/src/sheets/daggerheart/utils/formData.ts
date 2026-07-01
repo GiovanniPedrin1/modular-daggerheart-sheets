@@ -62,11 +62,13 @@ export function normalizeDaggerheartCharacterData(
 
 export function mergeSheetFieldsIntoDaggerheartData(
   currentData: unknown,
-  nextFields: SheetFormFields
+  nextPatch: DaggerheartCharacterData
 ): DaggerheartCharacterData {
-  const nextData: DaggerheartCharacterData = { ...nextFields };
+  const nextData: DaggerheartCharacterData = { ...extractSheetFields(nextPatch) };
 
-  if (
+  if (Object.prototype.hasOwnProperty.call(nextPatch, "detailsPage")) {
+    nextData.detailsPage = normalizeDetailsPage(nextPatch.detailsPage);
+  } else if (
     isPlainObject(currentData) &&
     Object.prototype.hasOwnProperty.call(currentData, "detailsPage")
   ) {
@@ -88,6 +90,10 @@ export function serializeSheetForm(form: HTMLFormElement): SerializedSheetData {
   const fields: SerializedSheetData["fields"] = {};
 
   for (const field of getSheetFields(form)) {
+    if (field.name === "detailsPage" || field.name.startsWith("detailsPage.")) {
+      continue;
+    }
+
     if (field instanceof HTMLInputElement) {
       if (field.type === "checkbox") {
         fields[field.name] = field.checked;

@@ -91,6 +91,38 @@ export const daggerheartTexts: Record<"pt-BR" | "en-US", DaggerheartTexts> = {
 
     chooseTwoOptions: "Escolha duas opções e marque-as.",
     notes: "Notas",
+    tabs: {
+      sheetNavigation: "Navegação da ficha",
+      sheet: "Ficha",
+      details: "Detalhes / História",
+    },
+
+    details: {
+      physicalDetails: "Detalhes físicos",
+      age: "Idade",
+      height: "Altura",
+      weight: "Peso",
+      other: "Outro",
+      eyes: "Olhos",
+      body: "Corpo",
+      hair: "Cabelos",
+      domainCards: "Cartas de domínio",
+      domainCardsPlaceholder:
+        "Liste suas cartas de domínio, níveis, efeitos e observações importantes...",
+      abilities: "Habilidades",
+      ancestryAbilities: "Habilidades de ancestralidade",
+      ancestryFirst: "1ª habilidade",
+      ancestrySecond: "2ª habilidade",
+      communityAbility: "Habilidade de comunidade",
+      foundationAbility: "Habilidade de fundamento",
+      castingAttribute: "Atributo de conjuração",
+      specializationAbility: "Habilidade especializada",
+      masteryAbility: "Habilidade de maestria",
+      abilityPlaceholder: "Descreva a habilidade, gatilhos, custos e efeitos...",
+      characterStory: "História do personagem",
+      characterStoryPlaceholder:
+        "Conte a história, objetivos, vínculos, segredos e anotações narrativas do personagem...",
+    },
 
     progression: {
       tiers: [
@@ -246,6 +278,38 @@ export const daggerheartTexts: Record<"pt-BR" | "en-US", DaggerheartTexts> = {
 
     chooseTwoOptions: "Choose two options and mark them.",
     notes: "Notes",
+    tabs: {
+      sheetNavigation: "Sheet navigation",
+      sheet: "Sheet",
+      details: "Details / Story",
+    },
+
+    details: {
+      physicalDetails: "Physical details",
+      age: "Age",
+      height: "Height",
+      weight: "Weight",
+      other: "Other",
+      eyes: "Eyes",
+      body: "Body",
+      hair: "Hair",
+      domainCards: "Domain cards",
+      domainCardsPlaceholder:
+        "List your domain cards, levels, effects, and important notes...",
+      abilities: "Abilities",
+      ancestryAbilities: "Ancestry abilities",
+      ancestryFirst: "1st ability",
+      ancestrySecond: "2nd ability",
+      communityAbility: "Community ability",
+      foundationAbility: "Foundation ability",
+      castingAttribute: "Spellcast trait",
+      specializationAbility: "Specialization ability",
+      masteryAbility: "Mastery ability",
+      abilityPlaceholder: "Describe the ability, triggers, costs, and effects...",
+      characterStory: "Character story",
+      characterStoryPlaceholder:
+        "Write the character's backstory, goals, bonds, secrets, and narrative notes...",
+    },
 
     progression: {
       tiers: [

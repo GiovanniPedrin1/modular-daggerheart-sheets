@@ -241,6 +241,37 @@ export type DaggerheartTexts = {
 
   chooseTwoOptions: string;
   notes: string;
+  tabs: {
+    sheetNavigation: string;
+    sheet: string;
+    details: string;
+  };
+
+  details: {
+    physicalDetails: string;
+    age: string;
+    height: string;
+    weight: string;
+    other: string;
+    eyes: string;
+    body: string;
+    hair: string;
+    domainCards: string;
+    domainCardsPlaceholder: string;
+    abilities: string;
+    ancestryAbilities: string;
+    ancestryFirst: string;
+    ancestrySecond: string;
+    communityAbility: string;
+    foundationAbility: string;
+    castingAttribute: string;
+    specializationAbility: string;
+    masteryAbility: string;
+    abilityPlaceholder: string;
+    characterStory: string;
+    characterStoryPlaceholder: string;
+  };
+
   progression: {
     tiers: {
       key: "tier2" | "tier3" | "tier4";
