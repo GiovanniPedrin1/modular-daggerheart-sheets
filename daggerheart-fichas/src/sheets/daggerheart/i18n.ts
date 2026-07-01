@@ -95,7 +95,22 @@ export const daggerheartTexts: Record<"pt-BR" | "en-US", DaggerheartTexts> = {
       sheetNavigation: "Navegação da ficha",
       sheet: "Ficha",
       details: "Detalhes / História",
+      progression: "Progressão",
+      classExtras: "Extras de Classe",
+      progressionEmptyTitle: "Progressão em preparação",
+      progressionEmptyDescription:
+        "O guia do personagem e as referências de evolução serão movidos para esta aba na próxima etapa.",
+      classExtrasEmptyTitle: "Extras de classe em preparação",
+      classExtrasEmptyDescription:
+        "Forma Bestial, Companheiro do Patrulheiro e futuros extras específicos por classe serão organizados aqui.",
     },
+
+    classExtras: {
+      emptyTitle: "Sem extras de classe automáticos",
+      emptyDescription:
+        "Esta classe não possui Forma Bestial ou Companheiro do Patrulheiro para exibir automaticamente. Extras manuais e homebrew podem entrar em uma versão futura.",
+    },
+
 
     details: {
       physicalDetails: "Detalhes físicos",
@@ -283,7 +298,22 @@ export const daggerheartTexts: Record<"pt-BR" | "en-US", DaggerheartTexts> = {
       sheetNavigation: "Sheet navigation",
       sheet: "Sheet",
       details: "Details / Story",
+      progression: "Progression",
+      classExtras: "Class Extras",
+      progressionEmptyTitle: "Progression in progress",
+      progressionEmptyDescription:
+        "The character guide and advancement references will move into this tab in the next step.",
+      classExtrasEmptyTitle: "Class extras in progress",
+      classExtrasEmptyDescription:
+        "Beastform, Ranger Companion, and future class-specific extras will be organized here.",
     },
+
+    classExtras: {
+      emptyTitle: "No automatic class extras",
+      emptyDescription:
+        "This class does not have Beastform or Ranger Companion content to show automatically. Manual and homebrew extras can be added in a future version.",
+    },
+
 
     details: {
       physicalDetails: "Physical details",

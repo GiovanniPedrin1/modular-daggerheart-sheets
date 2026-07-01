@@ -25,6 +25,15 @@ import {
   getInitialRouteCharacterId,
 } from "./services/routing";
 import { readSetting, writeSetting } from "./services/settingsService";
+import {
+  DEFAULT_VISUAL_PREFERENCES,
+  VISUAL_PREFERENCE_SETTING_KEYS,
+  SYSTEM_DARK_THEME_MEDIA_QUERY,
+  getSafeClassDecorationsEnabled,
+  getSafeThemePreference,
+  resolveThemePreference,
+  type ThemePreference,
+} from "./services/visualPreferencesService";
 import { SheetRenderer } from "./sheets/registry";
 import type { DaggerheartClassKey, Language } from "./sheets/daggerheart/types";
 
@@ -41,6 +50,12 @@ export default function App() {
 
   const [booted, setBooted] = useState(false);
   const [language, setLanguage] = useState<Language>("pt-BR");
+  const [themePreference, setThemePreference] = useState<ThemePreference>(
+    DEFAULT_VISUAL_PREFERENCES.theme
+  );
+  const [classDecorationsEnabled, setClassDecorationsEnabled] = useState(
+    DEFAULT_VISUAL_PREFERENCES.classDecorationsEnabled
+  );
   const [characters, setCharacters] = useState<CharacterRecord[]>([]);
   const [selectedCharacterId, setSelectedCharacterId] = useState("");
 
@@ -119,19 +134,35 @@ export default function App() {
           storedLanguage,
           storedLastCharacterId,
           storedProfileName,
+          storedThemePreference,
+          storedClassDecorationsEnabled,
           storedCharacters,
         ] = await Promise.all([
           readSetting<Language>("language", "pt-BR"),
           readSetting<string>("lastCharacterId", ""),
           readSetting<string>("profileName", ""),
+          readSetting<unknown>(
+            VISUAL_PREFERENCE_SETTING_KEYS.theme,
+            DEFAULT_VISUAL_PREFERENCES.theme
+          ),
+          readSetting<unknown>(
+            VISUAL_PREFERENCE_SETTING_KEYS.classDecorationsEnabled,
+            DEFAULT_VISUAL_PREFERENCES.classDecorationsEnabled
+          ),
           listActiveCharacters(),
         ]);
 
         if (cancelled) return;
 
         const safeLanguage = getSafeLanguage(storedLanguage, "pt-BR");
+        const safeThemePreference = getSafeThemePreference(storedThemePreference);
+        const safeClassDecorationsEnabled = getSafeClassDecorationsEnabled(
+          storedClassDecorationsEnabled
+        );
 
         setLanguage(safeLanguage);
+        setThemePreference(safeThemePreference);
+        setClassDecorationsEnabled(safeClassDecorationsEnabled);
         setProfileName(storedProfileName);
         setCharacters(storedCharacters);
 
@@ -197,8 +228,54 @@ export default function App() {
 
   useEffect(() => {
     if (!booted) return;
+
+    const root = document.documentElement;
+    const systemThemeQuery = window.matchMedia(SYSTEM_DARK_THEME_MEDIA_QUERY);
+
+    function applyTheme() {
+      const resolvedTheme = resolveThemePreference(
+        themePreference,
+        systemThemeQuery.matches
+      );
+
+      root.dataset.theme = resolvedTheme;
+      root.dataset.themePreference = themePreference;
+      root.style.colorScheme = resolvedTheme;
+
+      const themeColorMeta = document.querySelector<HTMLMetaElement>(
+        'meta[name="theme-color"]'
+      );
+
+      if (themeColorMeta) {
+        themeColorMeta.content = resolvedTheme === "dark" ? "#111318" : "#f7f4ec";
+      }
+    }
+
+    applyTheme();
+    systemThemeQuery.addEventListener("change", applyTheme);
+
+    return () => {
+      systemThemeQuery.removeEventListener("change", applyTheme);
+    };
+  }, [booted, themePreference]);
+
+  useEffect(() => {
+    if (!booted) return;
     writeSetting("language", language);
   }, [booted, language]);
+
+  useEffect(() => {
+    if (!booted) return;
+    writeSetting(VISUAL_PREFERENCE_SETTING_KEYS.theme, themePreference);
+  }, [booted, themePreference]);
+
+  useEffect(() => {
+    if (!booted) return;
+    writeSetting(
+      VISUAL_PREFERENCE_SETTING_KEYS.classDecorationsEnabled,
+      classDecorationsEnabled
+    );
+  }, [booted, classDecorationsEnabled]);
 
   useEffect(() => {
     if (!booted || !selectedCharacterId) return;
@@ -330,8 +407,20 @@ export default function App() {
       const storedCharacters = await refreshCharacters();
       const storedLanguage = await readSetting<Language>("language", language);
       const storedProfileName = await readSetting<string>("profileName", "");
+      const storedThemePreference = await readSetting<unknown>(
+        VISUAL_PREFERENCE_SETTING_KEYS.theme,
+        DEFAULT_VISUAL_PREFERENCES.theme
+      );
+      const storedClassDecorationsEnabled = await readSetting<unknown>(
+        VISUAL_PREFERENCE_SETTING_KEYS.classDecorationsEnabled,
+        DEFAULT_VISUAL_PREFERENCES.classDecorationsEnabled
+      );
 
       setLanguage(getSafeLanguage(storedLanguage, language));
+      setThemePreference(getSafeThemePreference(storedThemePreference));
+      setClassDecorationsEnabled(
+        getSafeClassDecorationsEnabled(storedClassDecorationsEnabled)
+      );
       setProfileName(storedProfileName);
       await selectBestCharacterAfterDataChange(storedCharacters);
       resetSaveStatus();
@@ -359,6 +448,10 @@ export default function App() {
         navigate("/");
       }
       setProfileName("");
+      setThemePreference(DEFAULT_VISUAL_PREFERENCES.theme);
+      setClassDecorationsEnabled(
+        DEFAULT_VISUAL_PREFERENCES.classDecorationsEnabled
+      );
       resetSaveStatus();
       setClearConfirmation("");
       setIsClearModalOpen(false);
@@ -507,6 +600,7 @@ export default function App() {
               onSheetDataChange={handleSheetDataChange}
               onSheetEditingStart={markSelectedCharacterEditing}
               onSheetEditingEnd={releaseSelectedCharacterEditing}
+              classDecorationsEnabled={classDecorationsEnabled}
             />
           ) : (
             <div className="empty-state">
@@ -598,6 +692,41 @@ export default function App() {
                 {settingsMessage.text}
               </p>
             )}
+
+            <section className="settings-section visual-preferences-section">
+              <div>
+                <h3>{t.visualPreferences}</h3>
+                <p>{t.visualPreferencesDescription}</p>
+              </div>
+
+              <label className="field compact-field">
+                <span>{t.theme}</span>
+                <select
+                  value={themePreference}
+                  onChange={(event) =>
+                    setThemePreference(event.target.value as ThemePreference)
+                  }
+                >
+                  <option value="light">{t.themeLight}</option>
+                  <option value="dark">{t.themeDark}</option>
+                  <option value="system">{t.themeSystem}</option>
+                </select>
+              </label>
+
+              <label className="checkbox-field compact-field">
+                <input
+                  type="checkbox"
+                  checked={classDecorationsEnabled}
+                  onChange={(event) =>
+                    setClassDecorationsEnabled(event.target.checked)
+                  }
+                />
+                <span>
+                  <strong>{t.classDecorations}</strong>
+                  <small>{t.classDecorationsHelp}</small>
+                </span>
+              </label>
+            </section>
 
             <section className="settings-section">
               <div>

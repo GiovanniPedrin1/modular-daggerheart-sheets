@@ -40,6 +40,16 @@ export const appTexts = {
     settingsTitle: "Configurações locais",
     settingsDescription:
       "Gerencie backups e dados salvos neste navegador. Tudo aqui funciona sem backend ou login.",
+    visualPreferences: "Preferências visuais",
+    visualPreferencesDescription:
+      "Ajuste tema e opções visuais salvas localmente neste dispositivo.",
+    theme: "Tema",
+    themeLight: "Claro",
+    themeDark: "Escuro",
+    themeSystem: "Sistema",
+    classDecorations: "Decorações por classe",
+    classDecorationsHelp:
+      "Ativa ou desativa identidades visuais opcionais baseadas na classe do personagem.",
     localData: "Dados locais",
     exportData: "Exportar dados",
     exportDescription:
@@ -122,6 +132,16 @@ export const appTexts = {
     settingsTitle: "Local settings",
     settingsDescription:
       "Manage backups and data saved in this browser. Everything here works without backend or login.",
+    visualPreferences: "Visual preferences",
+    visualPreferencesDescription:
+      "Adjust theme and visual options saved locally on this device.",
+    theme: "Theme",
+    themeLight: "Light",
+    themeDark: "Dark",
+    themeSystem: "System",
+    classDecorations: "Class decorations",
+    classDecorationsHelp:
+      "Turns optional visual identities based on the character class on or off.",
     localData: "Local data",
     exportData: "Export data",
     exportDescription:

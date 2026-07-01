@@ -245,6 +245,17 @@ export type DaggerheartTexts = {
     sheetNavigation: string;
     sheet: string;
     details: string;
+    progression: string;
+    classExtras: string;
+    progressionEmptyTitle: string;
+    progressionEmptyDescription: string;
+    classExtrasEmptyTitle: string;
+    classExtrasEmptyDescription: string;
+  };
+
+  classExtras: {
+    emptyTitle: string;
+    emptyDescription: string;
   };
 
   details: {

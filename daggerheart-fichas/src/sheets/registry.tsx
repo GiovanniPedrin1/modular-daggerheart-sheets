@@ -21,6 +21,7 @@ type SheetRendererProps = {
   onSheetDataChange?: (data: DaggerheartCharacterData) => void;
   onSheetEditingStart?: () => void;
   onSheetEditingEnd?: () => void;
+  classDecorationsEnabled?: boolean;
 };
 
 function isDaggerheartClassKey(value?: string): value is DaggerheartClassKey {
@@ -35,6 +36,7 @@ export function SheetRenderer({
   onSheetDataChange,
   onSheetEditingStart,
   onSheetEditingEnd,
+  classDecorationsEnabled = true,
 }: SheetRendererProps) {
   const t = daggerheartTexts[language];
 
@@ -59,6 +61,7 @@ export function SheetRenderer({
         onSheetDataChange={onSheetDataChange}
         onSheetEditingStart={onSheetEditingStart}
         onSheetEditingEnd={onSheetEditingEnd}
+        classDecorationsEnabled={classDecorationsEnabled}
       />
     );
   }

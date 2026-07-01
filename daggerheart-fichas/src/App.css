@@ -2,8 +2,68 @@
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
 
-  color: #1f2937;
-  background: #f3f4f6;
+  color-scheme: light;
+  --app-bg: #f3f4f6;
+  --app-window-bg: #ffffff;
+  --app-surface: #ffffff;
+  --app-surface-muted: #f9fafb;
+  --app-text: #111827;
+  --app-text-soft: #1f2937;
+  --app-muted: #6b7280;
+  --app-border: #d1d5db;
+  --app-border-soft: #e5e7eb;
+  --app-border-strong: #111827;
+  --app-control-bg: #ffffff;
+  --app-control-hover: #f9fafb;
+  --app-modal-backdrop: rgba(17, 24, 39, 0.45);
+  --app-nested-modal-backdrop: rgba(17, 24, 39, 0.2);
+  --app-shadow-lg: 0 20px 60px rgba(15, 23, 42, 0.3);
+  --app-danger: #991b1b;
+  --app-danger-strong: #7f1d1d;
+  --app-danger-bg: #fef2f2;
+  --app-danger-border: #fecaca;
+  --app-success: #166534;
+  --app-success-bg: #f0fdf4;
+  --app-success-border: #bbf7d0;
+  --app-warning: #9a3412;
+  --app-warning-strong: #7c2d12;
+  --app-warning-bg: #fff7ed;
+  --app-warning-border: #fed7aa;
+  --app-focus: #2563eb;
+
+  color: var(--app-text-soft);
+  background: var(--app-bg);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --app-bg: #111318;
+  --app-window-bg: #161b22;
+  --app-surface: #1c2028;
+  --app-surface-muted: #111827;
+  --app-text: #f4f0e8;
+  --app-text-soft: #e5e7eb;
+  --app-muted: #a7b0c0;
+  --app-border: #3b4350;
+  --app-border-soft: #2b3340;
+  --app-border-strong: #7b8493;
+  --app-control-bg: #202632;
+  --app-control-hover: #2a3240;
+  --app-modal-backdrop: rgba(0, 0, 0, 0.62);
+  --app-nested-modal-backdrop: rgba(0, 0, 0, 0.38);
+  --app-shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.55);
+  --app-danger: #fca5a5;
+  --app-danger-strong: #fecaca;
+  --app-danger-bg: #2f1518;
+  --app-danger-border: #7f1d1d;
+  --app-success: #86efac;
+  --app-success-bg: #102317;
+  --app-success-border: #166534;
+  --app-warning: #fdba74;
+  --app-warning-strong: #fed7aa;
+  --app-warning-bg: #2a1a0d;
+  --app-warning-border: #9a3412;
+  --app-focus: #60a5fa;
 }
 
 * {
@@ -12,6 +72,8 @@
 
 body {
   margin: 0;
+  background: var(--app-bg);
+  color: var(--app-text-soft);
 }
 
 button,
@@ -25,19 +87,20 @@ textarea {
   min-height: 100vh;
   display: flex;
   padding: 0;
+  background: var(--app-bg);
 }
 
 .app-window {
   width: min(100%);
   min-height: 620px;
-  background: #ffffff;
+  background: var(--app-window-bg);
   overflow: hidden;
 }
 
 .topbar {
   min-height: 64px;
   padding: 12px 20px;
-  border-bottom: 2px solid #111827;
+  border-bottom: 2px solid var(--app-border-strong);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -45,7 +108,7 @@ textarea {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: #ffffff;
+  background: var(--app-surface);
 }
 
 .topbar-left,
@@ -58,10 +121,10 @@ textarea {
 .button,
 .select {
   height: 36px;
-  border: 2px solid #111827;
+  border: 2px solid var(--app-border-strong);
   border-radius: 8px;
-  background: #ffffff;
-  color: #111827;
+  background: var(--app-control-bg);
+  color: var(--app-text);
 }
 
 .button {
@@ -71,20 +134,22 @@ textarea {
 }
 
 .button:hover {
-  background: #f9fafb;
+  background: var(--app-control-hover);
 }
 
 .button.secondary {
-  border-color: #d1d5db;
-  color: #374151;
-}
-.button.danger {
-  border-color: #991b1b;
-  color: #991b1b;
+  border-color: var(--app-border);
+  color: var(--app-text-soft);
 }
 
-.button.danger:hover:not(:disabled) {
-  background: #fef2f2;
+.button.danger {
+  border-color: var(--app-danger);
+  color: var(--app-danger);
+}
+
+.button.danger:hover:not(:disabled),
+.button.danger:hover {
+  background: var(--app-danger-bg);
 }
 
 .button:disabled {
@@ -95,17 +160,14 @@ textarea {
 .delete-confirm-name {
   margin: -8px 0 16px;
   padding: 10px 12px;
-  border: 1px solid #fecaca;
+  border: 1px solid var(--app-danger-border);
   border-radius: 10px;
-  background: #fef2f2;
-  color: #991b1b;
+  background: var(--app-danger-bg);
+  color: var(--app-danger);
   font-weight: 800;
   word-break: break-word;
 }
 
-.button.danger:hover {
-  background: #fef2f2;
-}
 .select {
   padding: 0 10px;
   min-width: 160px;
@@ -122,7 +184,7 @@ textarea {
 .sheet-area {
   min-height: 556px;
   padding: 24px;
-  background: #f3f4f6;
+  background: var(--app-bg);
 }
 
 .empty-state {
@@ -132,12 +194,12 @@ textarea {
   align-items: center;
   justify-content: center;
   text-align: center;
-  color: #6b7280;
+  color: var(--app-muted);
 }
 
 .empty-state h1 {
   margin: 0 0 8px;
-  color: #111827;
+  color: var(--app-text);
 }
 
 .empty-state p {
@@ -146,11 +208,11 @@ textarea {
 
 .sheet-card {
   position: relative;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--app-border-soft);
   border-radius: 20px;
   padding: 28px;
   min-height: 440px;
-  background: #ffffff;
+  background: var(--app-surface);
 }
 
 .sheet-card h1 {
@@ -160,12 +222,12 @@ textarea {
 .placeholder-box {
   margin-top: 24px;
   min-height: 180px;
-  border: 2px dashed #d1d5db;
+  border: 2px dashed var(--app-border);
   border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
+  color: var(--app-muted);
   text-align: center;
   padding: 24px;
 }
@@ -173,7 +235,7 @@ textarea {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(17, 24, 39, 0.45);
+  background: var(--app-modal-backdrop);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -183,19 +245,21 @@ textarea {
 
 .modal {
   width: min(100%, 420px);
-  background: #ffffff;
+  background: var(--app-surface);
+  color: var(--app-text-soft);
   border-radius: 20px;
   padding: 24px;
-  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.3);
+  box-shadow: var(--app-shadow-lg);
 }
 
 .modal h2 {
   margin: 0 0 16px;
+  color: var(--app-text);
 }
 
 .modal-description {
   margin: 0 0 20px;
-  color: #6b7280;
+  color: var(--app-muted);
   line-height: 1.5;
 }
 
@@ -213,8 +277,10 @@ textarea {
 .field input,
 .field select {
   height: 40px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--app-border);
   border-radius: 8px;
+  background: var(--app-control-bg);
+  color: var(--app-text);
   padding: 0 10px;
 }
 
@@ -273,13 +339,13 @@ textarea {
   gap: 16px;
   margin-bottom: 16px;
   padding: 12px 14px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--app-border-soft);
   border-radius: 12px;
-  background: #f9fafb;
+  background: var(--app-surface-muted);
 }
 
 .settings-summary span {
-  color: #6b7280;
+  color: var(--app-muted);
   text-align: right;
 }
 
@@ -291,15 +357,15 @@ textarea {
 }
 
 .settings-message.success {
-  border: 1px solid #bbf7d0;
-  background: #f0fdf4;
-  color: #166534;
+  border: 1px solid var(--app-success-border);
+  background: var(--app-success-bg);
+  color: var(--app-success);
 }
 
 .settings-message.error {
-  border: 1px solid #fecaca;
-  background: #fef2f2;
-  color: #991b1b;
+  border: 1px solid var(--app-danger-border);
+  background: var(--app-danger-bg);
+  color: var(--app-danger);
 }
 
 .settings-section {
@@ -308,22 +374,22 @@ textarea {
   gap: 12px 16px;
   align-items: center;
   padding: 16px 0;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--app-border-soft);
 }
 
 .settings-section h3 {
   margin: 0 0 4px;
-  color: #111827;
+  color: var(--app-text);
 }
 
 .settings-section p {
   margin: 0;
-  color: #6b7280;
+  color: var(--app-muted);
   line-height: 1.5;
 }
 
 .danger-section {
-  border-top-color: #fecaca;
+  border-top-color: var(--app-danger-border);
 }
 
 .compact-field {
@@ -353,7 +419,7 @@ textarea {
 }
 
 .nested-modal-backdrop {
-  background: rgba(17, 24, 39, 0.2);
+  background: var(--app-nested-modal-backdrop);
   z-index: 120;
 }
 
@@ -386,24 +452,24 @@ textarea {
   align-items: center;
   gap: 8px;
   padding: 0 12px;
-  border: 2px solid #d1d5db;
+  border: 2px solid var(--app-border);
   border-radius: 999px;
-  background: #ffffff;
-  color: #374151;
+  background: var(--app-surface);
+  color: var(--app-text-soft);
   font-weight: 700;
   white-space: nowrap;
 }
 
 .connection-status.online {
-  border-color: #bbf7d0;
-  background: #f0fdf4;
-  color: #166534;
+  border-color: var(--app-success-border);
+  background: var(--app-success-bg);
+  color: var(--app-success);
 }
 
 .connection-status.offline {
-  border-color: #fed7aa;
-  background: #fff7ed;
-  color: #9a3412;
+  border-color: var(--app-warning-border);
+  background: var(--app-warning-bg);
+  color: var(--app-warning);
 }
 
 .connection-dot {
@@ -420,15 +486,15 @@ textarea {
   gap: 16px;
   margin-bottom: 16px;
   padding: 12px 14px;
-  border: 1px solid #fed7aa;
+  border: 1px solid var(--app-warning-border);
   border-radius: 14px;
-  background: #fff7ed;
-  color: #9a3412;
+  background: var(--app-warning-bg);
+  color: var(--app-warning);
   line-height: 1.4;
 }
 
 .offline-banner strong {
-  color: #7c2d12;
+  color: var(--app-warning-strong);
   white-space: nowrap;
 }
 
@@ -443,4 +509,37 @@ textarea {
     flex-direction: column;
     gap: 4px;
   }
+}
+.checkbox-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 0;
+  color: var(--app-text-soft);
+}
+
+.checkbox-field input {
+  width: 18px;
+  height: 18px;
+  margin: 3px 0 0;
+  accent-color: var(--app-focus);
+}
+
+.checkbox-field span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.checkbox-field strong {
+  color: var(--app-text);
+}
+
+.checkbox-field small {
+  color: var(--app-muted);
+  line-height: 1.45;
+}
+
+.visual-preferences-section {
+  border-top: 0;
 }

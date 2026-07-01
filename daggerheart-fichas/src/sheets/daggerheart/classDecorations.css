@@ -1,0 +1,161 @@
+.dh-sheet[class*="dh-decoration-"] {
+  --dh-decoration-opacity: 0.72;
+  --dh-decoration-pattern-opacity: 0.42;
+  isolation: isolate;
+}
+
+:root[data-theme="dark"] .dh-sheet[class*="dh-decoration-"] {
+  --dh-decoration-opacity: 0.84;
+  --dh-decoration-pattern-opacity: 0.5;
+}
+
+.dh-sheet[class*="dh-decoration-"] > * {
+  position: relative;
+  z-index: 1;
+}
+
+.dh-sheet[class*="dh-decoration-"]::before,
+.dh-sheet[class*="dh-decoration-"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.dh-sheet[class*="dh-decoration-"]::before {
+  background: var(--dh-decoration-glow, none);
+  opacity: var(--dh-decoration-opacity);
+}
+
+.dh-sheet[class*="dh-decoration-"]::after {
+  background: var(--dh-decoration-pattern, none);
+  opacity: var(--dh-decoration-pattern-opacity);
+}
+
+.dh-decoration-sorcerer {
+  --dh-decoration-glow:
+    radial-gradient(circle at 0% 10%, rgba(147, 51, 234, 0.22), transparent 32%),
+    radial-gradient(circle at 100% 38%, rgba(192, 132, 252, 0.18), transparent 26%),
+    linear-gradient(90deg, rgba(88, 28, 135, 0.13), transparent 18%, transparent 82%, rgba(126, 34, 206, 0.14));
+  --dh-decoration-pattern:
+    repeating-linear-gradient(104deg, transparent 0 42px, rgba(168, 85, 247, 0.1) 43px 45px, transparent 46px 88px),
+    repeating-linear-gradient(76deg, transparent 0 62px, rgba(216, 180, 254, 0.08) 63px 64px, transparent 65px 118px);
+}
+
+.dh-decoration-druid {
+  --dh-decoration-glow:
+    radial-gradient(circle at 0% 72%, rgba(22, 163, 74, 0.18), transparent 34%),
+    radial-gradient(circle at 100% 22%, rgba(132, 204, 22, 0.16), transparent 28%),
+    linear-gradient(90deg, rgba(21, 128, 61, 0.12), transparent 16%, transparent 84%, rgba(77, 124, 15, 0.12));
+  --dh-decoration-pattern:
+    repeating-linear-gradient(118deg, transparent 0 46px, rgba(22, 101, 52, 0.1) 47px 50px, transparent 51px 96px),
+    radial-gradient(ellipse at 4% 18%, rgba(74, 222, 128, 0.16) 0 7px, transparent 8px),
+    radial-gradient(ellipse at 96% 64%, rgba(132, 204, 22, 0.15) 0 8px, transparent 9px),
+    radial-gradient(ellipse at 7% 82%, rgba(34, 197, 94, 0.14) 0 6px, transparent 7px);
+}
+
+.dh-decoration-ranger {
+  --dh-decoration-glow:
+    radial-gradient(circle at 0% 28%, rgba(101, 163, 13, 0.16), transparent 30%),
+    radial-gradient(circle at 100% 76%, rgba(34, 197, 94, 0.12), transparent 26%),
+    linear-gradient(90deg, rgba(63, 98, 18, 0.12), transparent 14%, transparent 86%, rgba(77, 124, 15, 0.12));
+  --dh-decoration-pattern:
+    repeating-linear-gradient(66deg, transparent 0 58px, rgba(77, 124, 15, 0.12) 59px 61px, transparent 62px 112px),
+    repeating-linear-gradient(112deg, transparent 0 72px, rgba(120, 113, 108, 0.1) 73px 75px, transparent 76px 140px),
+    radial-gradient(ellipse at 5% 40%, rgba(132, 204, 22, 0.15) 0 6px, transparent 7px),
+    radial-gradient(ellipse at 94% 18%, rgba(101, 163, 13, 0.14) 0 5px, transparent 6px);
+}
+
+.dh-decoration-warrior {
+  --dh-decoration-glow:
+    linear-gradient(90deg, rgba(127, 29, 29, 0.17), transparent 18%, transparent 82%, rgba(146, 64, 14, 0.16)),
+    radial-gradient(circle at 0% 40%, rgba(185, 28, 28, 0.12), transparent 28%),
+    radial-gradient(circle at 100% 18%, rgba(217, 119, 6, 0.12), transparent 26%);
+  --dh-decoration-pattern:
+    linear-gradient(90deg, rgba(153, 27, 27, 0.16) 0 18px, transparent 18px 84px, transparent calc(100% - 84px), rgba(120, 53, 15, 0.16) calc(100% - 84px) calc(100% - 18px), transparent calc(100% - 18px)),
+    repeating-linear-gradient(105deg, transparent 0 38px, rgba(69, 26, 3, 0.12) 39px 41px, transparent 42px 74px);
+}
+
+.dh-decoration-guardian {
+  --dh-decoration-glow:
+    radial-gradient(circle at 0% 26%, rgba(59, 130, 246, 0.13), transparent 30%),
+    radial-gradient(circle at 100% 70%, rgba(148, 163, 184, 0.18), transparent 30%),
+    linear-gradient(90deg, rgba(30, 64, 175, 0.1), transparent 18%, transparent 82%, rgba(71, 85, 105, 0.13));
+  --dh-decoration-pattern:
+    radial-gradient(ellipse at 5% 24%, transparent 0 25px, rgba(96, 165, 250, 0.14) 26px 29px, transparent 30px),
+    radial-gradient(ellipse at 96% 66%, transparent 0 31px, rgba(148, 163, 184, 0.16) 32px 35px, transparent 36px),
+    repeating-linear-gradient(90deg, transparent 0 86px, rgba(96, 165, 250, 0.07) 87px 89px, transparent 90px 168px);
+}
+
+.dh-decoration-seraph {
+  --dh-decoration-glow:
+    radial-gradient(circle at 0% 14%, rgba(250, 204, 21, 0.2), transparent 30%),
+    radial-gradient(circle at 100% 52%, rgba(251, 191, 36, 0.18), transparent 28%),
+    linear-gradient(90deg, rgba(202, 138, 4, 0.13), transparent 18%, transparent 82%, rgba(234, 179, 8, 0.14));
+  --dh-decoration-pattern:
+    radial-gradient(ellipse at 4% 36%, rgba(254, 240, 138, 0.28) 0 5px, transparent 6px),
+    radial-gradient(ellipse at 95% 22%, rgba(253, 224, 71, 0.24) 0 6px, transparent 7px),
+    radial-gradient(ellipse at 92% 76%, rgba(250, 204, 21, 0.2) 0 5px, transparent 6px),
+    repeating-linear-gradient(116deg, transparent 0 56px, rgba(202, 138, 4, 0.08) 57px 59px, transparent 60px 116px);
+}
+
+.dh-decoration-wizard {
+  --dh-decoration-glow:
+    radial-gradient(circle at 0% 18%, rgba(59, 130, 246, 0.18), transparent 30%),
+    radial-gradient(circle at 100% 62%, rgba(125, 211, 252, 0.15), transparent 28%),
+    linear-gradient(90deg, rgba(30, 64, 175, 0.12), transparent 16%, transparent 84%, rgba(14, 165, 233, 0.12));
+  --dh-decoration-pattern:
+    radial-gradient(circle at 5% 18%, rgba(191, 219, 254, 0.36) 0 2px, transparent 3px),
+    radial-gradient(circle at 10% 62%, rgba(147, 197, 253, 0.26) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 94% 28%, rgba(224, 242, 254, 0.3) 0 2px, transparent 3px),
+    radial-gradient(circle at 88% 78%, rgba(125, 211, 252, 0.24) 0 1.5px, transparent 2.5px),
+    repeating-linear-gradient(128deg, transparent 0 74px, rgba(96, 165, 250, 0.07) 75px 76px, transparent 77px 140px);
+}
+
+.dh-decoration-bard {
+  --dh-decoration-glow:
+    radial-gradient(circle at 0% 50%, rgba(236, 72, 153, 0.15), transparent 30%),
+    radial-gradient(circle at 100% 24%, rgba(249, 115, 22, 0.12), transparent 28%),
+    linear-gradient(90deg, rgba(190, 24, 93, 0.12), transparent 18%, transparent 82%, rgba(168, 85, 247, 0.12));
+  --dh-decoration-pattern:
+    repeating-radial-gradient(circle at 0% 50%, transparent 0 28px, rgba(236, 72, 153, 0.12) 29px 31px, transparent 32px 58px),
+    repeating-radial-gradient(circle at 100% 50%, transparent 0 34px, rgba(249, 115, 22, 0.1) 35px 37px, transparent 38px 66px);
+}
+
+.dh-decoration-rogue {
+  --dh-decoration-glow:
+    radial-gradient(circle at 0% 86%, rgba(15, 23, 42, 0.2), transparent 32%),
+    radial-gradient(circle at 100% 22%, rgba(51, 65, 85, 0.18), transparent 28%),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.16), transparent 16%, transparent 84%, rgba(30, 41, 59, 0.17));
+  --dh-decoration-pattern:
+    radial-gradient(ellipse at 8% 86%, rgba(15, 23, 42, 0.2), transparent 32%),
+    radial-gradient(ellipse at 96% 78%, rgba(51, 65, 85, 0.16), transparent 30%),
+    repeating-linear-gradient(96deg, transparent 0 54px, rgba(15, 23, 42, 0.08) 55px 58px, transparent 59px 112px);
+}
+
+:root[data-theme="dark"] .dh-decoration-sorcerer,
+:root[data-theme="dark"] .dh-decoration-druid,
+:root[data-theme="dark"] .dh-decoration-ranger,
+:root[data-theme="dark"] .dh-decoration-warrior,
+:root[data-theme="dark"] .dh-decoration-guardian,
+:root[data-theme="dark"] .dh-decoration-seraph,
+:root[data-theme="dark"] .dh-decoration-wizard,
+:root[data-theme="dark"] .dh-decoration-bard,
+:root[data-theme="dark"] .dh-decoration-rogue {
+  --dh-decoration-pattern-opacity: 0.36;
+}
+
+@media (max-width: 640px) {
+  .dh-sheet[class*="dh-decoration-"] {
+    --dh-decoration-opacity: 0.5;
+    --dh-decoration-pattern-opacity: 0.28;
+  }
+}
+
+@media print {
+  .dh-sheet[class*="dh-decoration-"]::before,
+  .dh-sheet[class*="dh-decoration-"]::after {
+    display: none;
+  }
+}

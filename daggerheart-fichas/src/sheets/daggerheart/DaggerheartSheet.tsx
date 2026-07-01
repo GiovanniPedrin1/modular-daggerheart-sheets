@@ -1,19 +1,20 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import "./daggerheartSheet.css";
+import "./classDecorations.css";
 
 import type { DaggerheartClassDefinition, DaggerheartDetailsPage, Language } from "./types";
 import { daggerheartTexts } from "./i18n";
+import { getDaggerheartClassDecorationClassName } from "./classDecorations";
 import { ArmorSection } from "./components/ArmorSection";
 import { ClassFeatureSection } from "./components/ClassFeatureSection";
+import { ClassExtrasTab } from "./components/ClassExtrasTab";
 import { DamageHealthSection } from "./components/DamageHealthSection";
-import { DruidBeastformSection } from "./components/DruidBeastformSection";
 import { DaggerheartDetailsTab } from "./components/DaggerheartDetailsTab";
 import { ExperiencesSection } from "./components/ExperiencesSection";
 import { GoldSection } from "./components/GoldSection";
-import { GuideSection } from "./components/GuideSection";
+import { ProgressionTab } from "./components/ProgressionTab";
 import { HopeSection } from "./components/HopeSection";
 import { InventorySection } from "./components/InventorySection";
-import { RangerCompanionSection } from "./components/RangerCompanionSection";
 import { SheetHeader } from "./components/SheetHeader";
 import { SummarySection } from "./components/SummarySection";
 import { TraitsSection } from "./components/TraitsSection";
@@ -32,7 +33,7 @@ type Character = {
   class?: string;
 };
 
-type ActiveTab = "sheet" | "details";
+type ActiveTab = "sheet" | "details" | "progression" | "classExtras";
 
 type DaggerheartSheetProps = {
   character: Character;
@@ -44,6 +45,7 @@ type DaggerheartSheetProps = {
   onSheetDataChange?: (data: DaggerheartCharacterData) => void;
   onSheetEditingStart?: () => void;
   onSheetEditingEnd?: () => void;
+  classDecorationsEnabled?: boolean;
 };
 
 export function DaggerheartSheet({
@@ -56,6 +58,7 @@ export function DaggerheartSheet({
   onSheetDataChange,
   onSheetEditingStart,
   onSheetEditingEnd,
+  classDecorationsEnabled = true,
 }: DaggerheartSheetProps) {
   const t = daggerheartTexts[language];
   const initialFields = extractSheetFields(initialData);
@@ -72,6 +75,12 @@ export function DaggerheartSheet({
   const detailsPageRef = useRef<DaggerheartDetailsPage>(initialDetailsPage);
   const shouldPersistDetailsPageRef = useRef(hasInitialDetailsPage);
 
+  const hasClassExtras = Boolean(definition.beastforms?.length || definition.companion);
+  const decorationClassName = getDaggerheartClassDecorationClassName(
+    definition,
+    classDecorationsEnabled
+  );
+
   const [activeTab, setActiveTab] = useState<ActiveTab>("sheet");
   const [detailsPage, setDetailsPage] =
     useState<DaggerheartDetailsPage>(initialDetailsPage);
@@ -81,9 +90,10 @@ export function DaggerheartSheet({
 
     hydrateSheetForm(formRef.current, { fields: initialFields });
     // Hidratar novamente a cada atualização otimista reescreveria campos enquanto o usuário digita.
-    // A ficha deve ser reidratada apenas ao trocar personagem ou idioma.
+    // A ficha deve ser reidratada apenas ao trocar personagem, idioma ou aba,
+    // porque abas desmontadas remontam campos não controlados.
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [character.id, language]);
+  }, [activeTab, character.id, language]);
 
   useEffect(() => {
     detailsPageRef.current = detailsPage;
@@ -104,6 +114,12 @@ export function DaggerheartSheet({
   useEffect(() => {
     onSheetEditingEndRef.current = onSheetEditingEnd;
   }, [onSheetEditingEnd]);
+
+  useEffect(() => {
+    if (activeTab === "classExtras" && !hasClassExtras) {
+      setActiveTab("sheet");
+    }
+  }, [activeTab, hasClassExtras]);
 
   useEffect(() => {
     const activeTypingKeys = activeTypingKeysRef.current;
@@ -229,7 +245,7 @@ export function DaggerheartSheet({
   return (
     <form
       ref={formRef}
-      className="dh-sheet"
+      className={`dh-sheet ${decorationClassName}`.trim()}
       autoComplete="off"
       lang={language}
       onInput={handleFormChange}
@@ -277,6 +293,24 @@ export function DaggerheartSheet({
         >
           {t.tabs.details}
         </button>
+        <button
+          className={`dh-tab ${activeTab === "progression" ? "is-active" : ""}`}
+          type="button"
+          aria-current={activeTab === "progression" ? "page" : undefined}
+          onClick={() => setActiveTab("progression")}
+        >
+          {t.tabs.progression}
+        </button>
+        {hasClassExtras ? (
+          <button
+            className={`dh-tab ${activeTab === "classExtras" ? "is-active" : ""}`}
+            type="button"
+            aria-current={activeTab === "classExtras" ? "page" : undefined}
+            onClick={() => setActiveTab("classExtras")}
+          >
+            {t.tabs.classExtras}
+          </button>
+        ) : null}
       </nav>
 
       {activeTab === "sheet" ? (
@@ -304,27 +338,11 @@ export function DaggerheartSheet({
             </div>
           </div>
 
-          {definition.beastforms ? (
-            <DruidBeastformSection
-              beastforms={definition.beastforms}
-              language={language}
-              t={t}
-            />
-          ) : null}
-
-          {definition.companion ? (
-            <RangerCompanionSection
-              companion={definition.companion}
-              language={language}
-              t={t}
-            />
-          ) : null}
-
-          <GuideSection definition={definition} language={language} t={t} />
-
           <p className="dh-print-note">{t.printNote}</p>
         </main>
-      ) : (
+      ) : null}
+
+      {activeTab === "details" ? (
         <main className="dh-content dh-stack">
           <DaggerheartDetailsTab
             value={detailsPage}
@@ -332,7 +350,19 @@ export function DaggerheartSheet({
             onChange={handleDetailsChange}
           />
         </main>
-      )}
+      ) : null}
+
+      {activeTab === "progression" ? (
+        <main className="dh-content dh-stack">
+          <ProgressionTab definition={definition} language={language} t={t} />
+        </main>
+      ) : null}
+
+      {activeTab === "classExtras" && hasClassExtras ? (
+        <main className="dh-content dh-stack">
+          <ClassExtrasTab definition={definition} language={language} t={t} />
+        </main>
+      ) : null}
     </form>
   );
 }

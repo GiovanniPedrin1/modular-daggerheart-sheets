@@ -1,12 +1,19 @@
 .dh-sheet {
-  --dh-paper: #ffffff;
-  --dh-ink: #1f2937;
-  --dh-muted: #6b7280;
-  --dh-line: #d1d5db;
-  --dh-line-dark: #9ca3af;
-  --dh-brand: #2f3136;
-  --dh-brand-2: #4b5563;
-  --dh-accent: #111827;
+  --dh-paper: var(--app-surface);
+  --dh-card-bg: var(--app-surface);
+  --dh-surface-muted: var(--app-surface-muted);
+  --dh-input-bg: var(--app-control-bg);
+  --dh-hero-muted: var(--app-border-soft);
+  --dh-ink: var(--app-text-soft);
+  --dh-muted: var(--app-muted);
+  --dh-line: var(--app-border-soft);
+  --dh-line-dark: var(--app-border);
+  --dh-brand: var(--app-text);
+  --dh-brand-2: var(--app-text-soft);
+  --dh-brand-fill: #2f3136;
+  --dh-brand-fill-2: #4b5563;
+  --dh-on-brand: #ffffff;
+  --dh-accent: var(--app-text);
   --dh-shadow: 0 14px 40px rgba(15, 23, 42, 0.12);
   --dh-radius: 18px;
   --dh-gap: 14px;
@@ -23,6 +30,21 @@
   overflow: hidden;
 }
 
+:root[data-theme="dark"] .dh-sheet {
+  --dh-brand-fill: #374151;
+  --dh-brand-fill-2: #4b5563;
+  --dh-on-brand: #f9fafb;
+  --dh-shadow: 0 14px 40px rgba(0, 0, 0, 0.36);
+  --dh-save-editing-bg: #10233f;
+  --dh-save-editing-text: #93c5fd;
+  --dh-save-saving-bg: #2a1a0d;
+  --dh-save-saving-text: #fdba74;
+  --dh-save-saved-bg: #102317;
+  --dh-save-saved-text: #86efac;
+  --dh-save-error-bg: #2f1518;
+  --dh-save-error-text: #fca5a5;
+}
+
 .dh-sheet * {
   box-sizing: border-box;
 }
@@ -33,26 +55,26 @@
   z-index: 3;
   padding: 7px 12px;
   border-bottom: 1px solid var(--dh-line);
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: var(--dh-save-editing-bg, #eff6ff);
+  color: var(--dh-save-editing-text, #1d4ed8);
   font-size: 0.82rem;
   font-weight: 800;
   text-align: right;
 }
 
 .dh-save-status.is-saving {
-  background: #fff7ed;
-  color: #c2410c;
+  background: var(--dh-save-saving-bg, #fff7ed);
+  color: var(--dh-save-saving-text, #c2410c);
 }
 
 .dh-save-status.is-saved {
-  background: #ecfdf5;
-  color: #047857;
+  background: var(--dh-save-saved-bg, #ecfdf5);
+  color: var(--dh-save-saved-text, #047857);
 }
 
 .dh-save-status.is-error {
-  background: #fef2f2;
-  color: #b91c1c;
+  background: var(--dh-save-error-bg, #fef2f2);
+  color: var(--dh-save-error-text, #b91c1c);
 }
 
 .dh-sheet label,
@@ -79,7 +101,7 @@
   min-width: 0;
   border: 1px solid var(--dh-line-dark);
   border-radius: 10px;
-  background: #fff;
+  background: var(--dh-input-bg);
   color: var(--dh-ink);
   padding: 9px 10px;
   font: inherit;
@@ -110,12 +132,12 @@
   gap: 18px;
   align-items: stretch;
   min-height: 112px;
-  border-bottom: 3px solid var(--dh-brand);
-  background: linear-gradient(105deg, var(--dh-brand) 0 31%, #e5e7eb 31% 100%);
+  border-bottom: 3px solid var(--dh-brand-fill);
+  background: linear-gradient(105deg, var(--dh-brand-fill) 0 31%, var(--dh-hero-muted) 31% 100%);
 }
 
 .dh-class-title {
-  color: #fff;
+  color: var(--dh-on-brand);
   padding: 24px 28px;
 }
 
@@ -132,7 +154,7 @@
   font-size: 1.32rem;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.86);
+  color: color-mix(in srgb, var(--dh-on-brand), transparent 14%);
 }
 
 .dh-identity {
@@ -188,7 +210,7 @@
 .dh-card {
   border: 1px solid var(--dh-line);
   border-radius: 16px;
-  background: #fff;
+  background: var(--dh-card-bg);
   overflow: hidden;
 }
 
@@ -199,7 +221,7 @@
   gap: 10px;
   padding: 8px 14px;
   border-bottom: 1px solid var(--dh-line);
-  background: #f9fafb;
+  background: var(--dh-surface-muted);
   color: var(--dh-brand);
   text-align: center;
   text-transform: uppercase;
@@ -247,7 +269,7 @@
 .dh-trait-card {
   border: 1px solid var(--dh-line);
   border-radius: 14px;
-  background: #fff;
+  background: var(--dh-card-bg);
   padding: 10px;
   min-height: 160px;
   display: grid;
@@ -267,8 +289,8 @@
   grid-area: name;
   font-weight: 900;
   text-transform: uppercase;
-  color: #fff;
-  background: var(--dh-brand);
+  color: var(--dh-on-brand);
+  background: var(--dh-brand-fill);
   border-radius: 8px;
   padding: 5px 8px;
   font-size: 0.82rem;
@@ -287,7 +309,7 @@
   grid-area: check;
   width: 24px;
   height: 24px;
-  accent-color: var(--dh-brand);
+  accent-color: var(--dh-brand-fill);
   justify-self: center;
 }
 
@@ -308,7 +330,7 @@
   border: 1px solid var(--dh-line);
   border-radius: 14px;
   padding: 11px;
-  background: #fff;
+  background: var(--dh-card-bg);
   text-align: center;
 }
 
@@ -336,14 +358,14 @@
   border-radius: 14px;
   padding: 10px;
   text-align: center;
-  background: #f9fafb;
+  background: var(--dh-surface-muted);
 }
 
 .dh-threshold strong {
   display: block;
   margin-bottom: 4px;
-  color: #fff;
-  background: var(--dh-brand-2);
+  color: var(--dh-on-brand);
+  background: var(--dh-brand-fill-2);
   border-radius: 8px;
   padding: 5px 4px;
   text-transform: uppercase;
@@ -378,21 +400,21 @@
 .dh-slot input[type="checkbox"] {
   width: 26px;
   height: 26px;
-  accent-color: var(--dh-brand);
+  accent-color: var(--dh-brand-fill);
 }
 
 .dh-diamond input[type="checkbox"] {
   width: 25px;
   height: 25px;
   transform: rotate(45deg);
-  accent-color: var(--dh-brand);
+  accent-color: var(--dh-brand-fill);
 }
 
 .dh-coin input[type="checkbox"] {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  accent-color: var(--dh-brand);
+  accent-color: var(--dh-brand-fill);
 }
 
 .dh-slot-number {
@@ -409,7 +431,7 @@
   border: 1px solid var(--dh-line);
   border-radius: 14px;
   padding: 12px;
-  background: #fff;
+  background: var(--dh-card-bg);
   display: grid;
   gap: 10px;
 }
@@ -440,7 +462,7 @@
 .dh-checkbox-inline input {
   width: 18px;
   height: 18px;
-  accent-color: var(--dh-brand);
+  accent-color: var(--dh-brand-fill);
 }
 
 .dh-experience-list {
@@ -495,7 +517,7 @@
   border: 1px solid var(--dh-line);
   border-radius: 14px;
   padding: 12px;
-  background: #f9fafb;
+  background: var(--dh-surface-muted);
 }
 
 .dh-reference-section h3 {
@@ -545,12 +567,12 @@
   border: 1px solid var(--dh-line);
   border-radius: 16px;
   overflow: hidden;
-  background: #fff;
+  background: var(--dh-card-bg);
 }
 
 .dh-tier-header {
-  background: var(--dh-brand-2);
-  color: #fff;
+  background: var(--dh-brand-fill-2);
+  color: var(--dh-on-brand);
   padding: 12px;
   text-align: center;
 }
@@ -587,7 +609,7 @@
 .dh-tier-option input {
   width: 20px;
   height: 20px;
-  accent-color: var(--dh-brand);
+  accent-color: var(--dh-brand-fill);
 }
 
 details.dh-card summary {
@@ -619,7 +641,7 @@ details.dh-card summary::-webkit-details-marker {
   border: 1px solid var(--dh-line);
   border-radius: 14px;
   padding: 12px;
-  background: #f9fafb;
+  background: var(--dh-surface-muted);
 }
 
 .dh-beastform-current h3,
@@ -645,7 +667,7 @@ details.dh-card summary::-webkit-details-marker {
 
 .dh-beastform-tier > h3 {
   padding: 6px 10px;
-  background: #e5e7eb;
+  background: var(--dh-hero-muted);
   border-radius: 8px;
   letter-spacing: 0.04em;
 }
@@ -663,7 +685,7 @@ details.dh-card summary::-webkit-details-marker {
   border: 1px solid var(--dh-line);
   border-radius: 14px;
   padding: 11px;
-  background: #fff;
+  background: var(--dh-card-bg);
 }
 
 .dh-beastform-card-title {
@@ -682,7 +704,7 @@ details.dh-card summary::-webkit-details-marker {
   width: 18px;
   height: 18px;
   margin-top: 2px;
-  accent-color: var(--dh-brand);
+  accent-color: var(--dh-brand-fill);
 }
 
 .dh-beastform-examples,
@@ -809,7 +831,7 @@ textarea.dh-companion-image-box {
 
 .dh-training-checks input,
 .dh-radio-row input {
-  accent-color: var(--dh-brand);
+  accent-color: var(--dh-brand-fill);
 }
 
 .dh-training-hope {
@@ -842,7 +864,7 @@ textarea.dh-companion-image-box {
 .dh-tab {
   border: 1px solid var(--dh-line);
   border-radius: 999px;
-  background: #ffffff;
+  background: var(--dh-card-bg);
   color: var(--dh-brand);
   cursor: pointer;
   font-family: inherit;
@@ -864,9 +886,9 @@ textarea.dh-companion-image-box {
 }
 
 .dh-tab.is-active {
-  background: var(--dh-brand);
+  background: var(--dh-brand-fill);
   border-color: var(--dh-brand);
-  color: #ffffff;
+  color: var(--dh-on-brand);
 }
 
 
@@ -923,12 +945,12 @@ textarea.dh-companion-image-box {
 @media (max-width: 1040px) {
   .dh-hero {
     grid-template-columns: 1fr;
-    background: #e5e7eb;
+    background: var(--dh-hero-muted);
     gap: 0;
   }
 
   .dh-class-title {
-    background: var(--dh-brand);
+    background: var(--dh-brand-fill);
   }
 
   .dh-identity {
@@ -1053,4 +1075,30 @@ textarea.dh-companion-image-box {
   .dh-tab {
     flex: 1 1 150px;
   }
+}
+
+.dh-empty-tab {
+  border: 1px dashed var(--dh-line-dark);
+  border-radius: 16px;
+  background: var(--dh-surface-muted);
+  color: var(--dh-muted);
+  padding: 24px;
+  text-align: center;
+}
+
+.dh-empty-tab h2 {
+  margin: 0 0 8px;
+  color: var(--dh-brand);
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dh-empty-tab p {
+  margin: 0 auto;
+  max-width: 640px;
+}
+
+.dh-class-extras-tab {
+  align-items: stretch;
 }
