@@ -265,6 +265,7 @@ export type DaggerheartTexts = {
     communityAbility: string;
     foundationAbility: string;
     castingAttribute: string;
+    foundationDescription: string;
     specializationAbility: string;
     masteryAbility: string;
     abilityPlaceholder: string;

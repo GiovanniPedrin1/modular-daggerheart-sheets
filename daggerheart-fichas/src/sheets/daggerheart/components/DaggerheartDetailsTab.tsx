@@ -215,7 +215,7 @@ export function DaggerheartDetailsTab({
                 <TextAreaField
                   id="details-foundation-text"
                   name="detailsPage.abilities.foundation.text"
-                  label={t.details.foundationAbility}
+                  label={t.details.foundationDescription}
                   placeholder={t.details.abilityPlaceholder}
                   value={details.abilities.foundation.text}
                   onChange={(event) =>

@@ -64,7 +64,12 @@ export function mergeSheetFieldsIntoDaggerheartData(
   currentData: unknown,
   nextPatch: DaggerheartCharacterData
 ): DaggerheartCharacterData {
-  const nextData: DaggerheartCharacterData = { ...extractSheetFields(nextPatch) };
+  const currentFields = extractSheetFields(currentData);
+  const nextFields = extractSheetFields(nextPatch);
+  const nextData: DaggerheartCharacterData = {
+    ...currentFields,
+    ...nextFields,
+  };
 
   if (Object.prototype.hasOwnProperty.call(nextPatch, "detailsPage")) {
     nextData.detailsPage = normalizeDetailsPage(nextPatch.detailsPage);

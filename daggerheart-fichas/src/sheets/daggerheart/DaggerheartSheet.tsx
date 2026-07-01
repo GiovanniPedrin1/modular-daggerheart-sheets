@@ -59,6 +59,9 @@ export function DaggerheartSheet({
 }: DaggerheartSheetProps) {
   const t = daggerheartTexts[language];
   const initialFields = extractSheetFields(initialData);
+  const hasInitialDetailsPage = Boolean(
+    initialData && Object.prototype.hasOwnProperty.call(initialData, "detailsPage")
+  );
   const initialDetailsPage = normalizeDetailsPage(initialData?.detailsPage);
   const initialDetailsSnapshot = JSON.stringify(initialDetailsPage);
 
@@ -67,6 +70,7 @@ export function DaggerheartSheet({
   const editingEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onSheetEditingEndRef = useRef(onSheetEditingEnd);
   const detailsPageRef = useRef<DaggerheartDetailsPage>(initialDetailsPage);
+  const shouldPersistDetailsPageRef = useRef(hasInitialDetailsPage);
 
   const [activeTab, setActiveTab] = useState<ActiveTab>("sheet");
   const [detailsPage, setDetailsPage] =
@@ -84,6 +88,10 @@ export function DaggerheartSheet({
   useEffect(() => {
     detailsPageRef.current = detailsPage;
   }, [detailsPage]);
+
+  useEffect(() => {
+    shouldPersistDetailsPageRef.current = hasInitialDetailsPage;
+  }, [character.id, hasInitialDetailsPage]);
 
   useEffect(() => {
     if (JSON.stringify(detailsPageRef.current) === initialDetailsSnapshot) {
@@ -178,22 +186,44 @@ export function DaggerheartSheet({
     markEditingEndedSoon();
   }
 
-  function handleFormChange() {
-    if (!formRef.current || !onSheetDataChange) return;
+  function getCurrentSheetFields() {
+    return formRef.current ? serializeSheetForm(formRef.current).fields : initialFields;
+  }
 
-    const serialized = serializeSheetForm(formRef.current);
-    onSheetDataChange(serialized.fields);
+  function buildSheetDataPatch(options: {
+    detailsPage?: DaggerheartDetailsPage;
+    persistDetailsPage?: boolean;
+  } = {}): DaggerheartCharacterData {
+    const patch: DaggerheartCharacterData = {
+      ...getCurrentSheetFields(),
+    };
+
+    if (options.persistDetailsPage || shouldPersistDetailsPageRef.current) {
+      patch.detailsPage = options.detailsPage ?? detailsPageRef.current;
+    }
+
+    return patch;
+  }
+
+  function handleFormChange() {
+    if (!onSheetDataChange) return;
+
+    onSheetDataChange(buildSheetDataPatch());
   }
 
   function handleDetailsChange(nextDetailsPage: DaggerheartDetailsPage) {
+    shouldPersistDetailsPageRef.current = true;
+    detailsPageRef.current = nextDetailsPage;
     setDetailsPage(nextDetailsPage);
 
     if (!onSheetDataChange) return;
 
-    onSheetDataChange({
-      ...initialFields,
-      detailsPage: nextDetailsPage,
-    });
+    onSheetDataChange(
+      buildSheetDataPatch({
+        detailsPage: nextDetailsPage,
+        persistDetailsPage: true,
+      })
+    );
   }
 
   return (
