@@ -1,0 +1,5 @@
+{
+  "version": "1.2.2",
+  "buildId": "1.2.2-sw-recovery",
+  "cachePolicy": "network-first-html-and-sw-recovery"
+}

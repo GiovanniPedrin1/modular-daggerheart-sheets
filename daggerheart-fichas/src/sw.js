@@ -1,16 +1,65 @@
-import { clientsClaim } from 'workbox-core';
+import { clientsClaim, setCacheNameDetails } from 'workbox-core';
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
 import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 
-const APP_VERSION = '1.2.1-cache-hotfix';
+const APP_VERSION = '1.2.2-sw-recovery';
 const APP_SHELL_CACHE = `daggerheart-app-shell-${APP_VERSION}`;
+const VERSION_MESSAGE = 'DAGGERHEART_GET_SW_VERSION';
+const VERSION_RESPONSE = 'DAGGERHEART_SW_VERSION';
 const INDEX_URL = '/index.html';
+
+setCacheNameDetails({
+  prefix: 'daggerheart',
+  suffix: APP_VERSION,
+});
 
 self.skipWaiting();
 clientsClaim();
 cleanupOutdatedCaches();
+
+function shouldDeleteLegacyCache(cacheName) {
+  const normalized = cacheName.toLowerCase();
+
+  if (normalized.includes(APP_VERSION.toLowerCase())) {
+    return false;
+  }
+
+  return (
+    normalized.startsWith('workbox-') ||
+    normalized.includes('workbox-precache') ||
+    normalized.includes('precache') ||
+    normalized.includes('runtime') ||
+    normalized.startsWith('daggerheart-')
+  );
+}
+
+async function deleteLegacyCaches() {
+  const cacheNames = await caches.keys();
+  await Promise.all(
+    cacheNames
+      .filter(shouldDeleteLegacyCache)
+      .map((cacheName) => caches.delete(cacheName)),
+  );
+}
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === VERSION_MESSAGE) {
+    event.ports?.[0]?.postMessage({
+      type: VERSION_RESPONSE,
+      version: APP_VERSION,
+    });
+  }
+
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(deleteLegacyCaches());
+});
 
 const precacheManifest = self.__WB_MANIFEST.filter(
   (entry) => !entry.url.endsWith('index.html'),
