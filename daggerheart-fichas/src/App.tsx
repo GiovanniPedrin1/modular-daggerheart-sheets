@@ -1573,7 +1573,7 @@ export default function App() {
 
             <div className="modal-actions">
               <button
-                className="button secondary"
+                className="button secondary backup-button"
                 type="button"
                 disabled={isCloudActionPending}
                 onClick={closeRestoreMergeModal}
@@ -1582,7 +1582,7 @@ export default function App() {
               </button>
 
               <button
-                className="button danger"
+                className="button danger backup-button"
                 type="button"
                 disabled={isCloudActionPending}
                 onClick={openRestoreReplaceModal}
@@ -1591,7 +1591,7 @@ export default function App() {
               </button>
 
               <button
-                className="button"
+                className="button backup-button"
                 type="button"
                 disabled={isCloudActionPending}
                 onClick={handleConfirmRestoreMerge}

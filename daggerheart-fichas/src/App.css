@@ -854,6 +854,10 @@ textarea {
   flex-wrap: wrap;
 }
 
+.backup-button {
+  height: 52px;
+}
+
 @media (max-width: 720px) {
   .auth-header {
     align-items: stretch;
