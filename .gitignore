@@ -139,3 +139,8 @@ dist
 # Just to be safe
 *.zip
 sync_dist.sh
+
+
+# Python
+__pycache__
+.venv

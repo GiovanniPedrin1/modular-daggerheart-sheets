@@ -73,6 +73,24 @@ function parseRequestId(response: Response) {
   );
 }
 
+function normalizeApiErrorBody(value: unknown): ApiErrorBody | undefined {
+  if (!isApiErrorBody(value)) {
+    return undefined;
+  }
+
+  if (typeof value.code === "string" || typeof value.message === "string") {
+    return value;
+  }
+
+  const detail = (value as { detail?: unknown }).detail;
+
+  if (isApiErrorBody(detail)) {
+    return detail;
+  }
+
+  return value;
+}
+
 async function parseResponseBody(response: Response) {
   const text = await response.text();
 
@@ -156,7 +174,7 @@ export class ApiClient {
       const body = await parseResponseBody(response);
 
       if (!response.ok) {
-        const errorBody = isApiErrorBody(body) ? body : undefined;
+        const errorBody = normalizeApiErrorBody(body);
         throw new ApiClientError({
           message:
             errorBody?.message ??

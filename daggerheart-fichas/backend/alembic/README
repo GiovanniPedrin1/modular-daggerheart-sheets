@@ -1,0 +1,7 @@
+Alembic migrations for Daggerheart Fichas API.
+
+Common commands:
+
+  alembic upgrade head
+  alembic downgrade -1
+  alembic revision --autogenerate -m "describe change"

@@ -629,3 +629,39 @@ textarea {
     flex-direction: column;
   }
 }
+
+.cloud-backup-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--app-border-soft);
+  border-radius: 12px;
+  background: var(--app-surface-muted);
+  color: var(--app-muted);
+}
+
+.cloud-backup-list strong {
+  color: var(--app-text);
+}
+
+.cloud-backup-list ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cloud-backup-list li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--app-border-soft);
+}
+
+.cloud-backup-list small {
+  color: var(--app-muted);
+}

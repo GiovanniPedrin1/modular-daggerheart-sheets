@@ -16,19 +16,24 @@ import {
   buildBackupFilename,
   clearLocalData,
   downloadJson,
+  exportCloudBackupPayload,
   exportLocalData,
   importLocalData,
   type ImportMode,
 } from "./services/localDataService";
-import { isCloudApiConfigured } from "./services/apiClient";
+import { ApiClientError, isCloudApiConfigured } from "./services/apiClient";
 import {
   getCharacterRoutePath,
   getDecodedRouteParam,
   getInitialRouteCharacterId,
 } from "./services/routing";
 import {
+  getOrCreateDeviceId,
   readCloudLocalMetadata,
   readSetting,
+  recordCloudBackupMetadata,
+  recordCloudRestoreMetadata,
+  writeCloudLocalMetadata,
   writeSetting,
   type CloudLocalMetadata,
 } from "./services/settingsService";
@@ -41,10 +46,25 @@ import {
   resolveThemePreference,
   type ThemePreference,
 } from "./services/visualPreferencesService";
+import {
+  getCurrentUser,
+  login,
+  logout as logoutFromCloud,
+  registerAccount,
+  type UserAccount,
+} from "./services/authService";
+import {
+  createBackup as createCloudBackup,
+  getLatestBackup,
+  listBackups,
+  type CloudBackup,
+} from "./services/cloudBackupService";
 import { SheetRenderer } from "./sheets/registry";
 import type { DaggerheartClassKey, Language } from "./sheets/daggerheart/types";
 
-type SettingsMessage = { kind: "success" | "error"; text: string } | null;
+type SettingsMessage = { kind: "success" | "error" | "info"; text: string } | null;
+type AuthMode = "login" | "register";
+type AuthMessage = { kind: "success" | "error" | "info"; text: string } | null;
 
 export default function App() {
   const navigate = useNavigate();
@@ -66,6 +86,10 @@ export default function App() {
   const [cloudMetadata, setCloudMetadata] = useState<CloudLocalMetadata | null>(
     null
   );
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
+  const [cloudBackups, setCloudBackups] = useState<CloudBackup[]>([]);
+  const [isCloudSessionLoading, setIsCloudSessionLoading] = useState(false);
+  const [isCloudActionPending, setIsCloudActionPending] = useState(false);
   const [characters, setCharacters] = useState<CharacterRecord[]>([]);
   const [selectedCharacterId, setSelectedCharacterId] = useState("");
 
@@ -81,6 +105,11 @@ export default function App() {
     useState<CharacterSystem>("daggerheart");
 
   const [profileName, setProfileName] = useState("");
+  const [authMode, setAuthMode] = useState<AuthMode>("login");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authDisplayName, setAuthDisplayName] = useState("");
+  const [authMessage, setAuthMessage] = useState<AuthMessage>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteConfirmationName, setDeleteConfirmationName] = useState("");
   const [importMode, setImportMode] = useState<ImportMode>("merge");
@@ -91,6 +120,8 @@ export default function App() {
   const isOnline = useOnlineStatus();
   const cloudApiConfigured = isCloudApiConfigured();
   const appVersionLabel = getAppVersionLabel();
+  const canUseCloud = isOnline && cloudApiConfigured;
+  const signedInLabel = currentUser?.displayName || currentUser?.email || "";
 
   const selectedCharacter = useMemo(() => {
     return characters.find((character) => character.id === selectedCharacterId);
@@ -212,6 +243,65 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!booted || !cloudApiConfigured || !isOnline) {
+      if (!cloudApiConfigured) {
+        setCurrentUser(null);
+        setCloudBackups([]);
+      }
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadCloudSession() {
+      setIsCloudSessionLoading(true);
+
+      try {
+        const response = await getCurrentUser();
+
+        if (cancelled) return;
+
+        const user = response.user;
+        setCurrentUser(user);
+
+        if (user) {
+          await writeCloudLocalMetadata({
+            accountHint: user.email,
+          });
+          setCloudMetadata(await readCloudLocalMetadata());
+
+          try {
+            const backupsResponse = await listBackups();
+            if (!cancelled) {
+              setCloudBackups(backupsResponse.backups);
+            }
+          } catch (error) {
+            console.warn("Não foi possível carregar backups da nuvem:", error);
+          }
+        } else {
+          setCloudBackups([]);
+        }
+      } catch (error) {
+        console.warn("Não foi possível carregar sessão da nuvem:", error);
+        if (!cancelled) {
+          setCurrentUser(null);
+          setCloudBackups([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsCloudSessionLoading(false);
+        }
+      }
+    }
+
+    loadCloudSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [booted, cloudApiConfigured, isOnline]);
+
+  useEffect(() => {
     if (!booted) return;
 
     if (routeCharacterId) {
@@ -303,6 +393,39 @@ export default function App() {
     return storedCharacters;
   }
 
+  function getErrorText(error: unknown, fallback: string) {
+    if (error instanceof ApiClientError) {
+      const requestIdSuffix = error.requestId ? ` (${t.requestId}: ${error.requestId})` : "";
+      return `${error.message || fallback}${requestIdSuffix}`;
+    }
+
+    return fallback;
+  }
+
+  async function refreshCloudMetadata() {
+    const nextCloudMetadata = await readCloudLocalMetadata();
+    setCloudMetadata(nextCloudMetadata);
+    return nextCloudMetadata;
+  }
+
+  async function refreshCloudBackups() {
+    if (!canUseCloud || !currentUser) return [];
+
+    const response = await listBackups();
+    setCloudBackups(response.backups);
+    return response.backups;
+  }
+
+  function openLoginModal(nextMode: AuthMode = "login") {
+    setAuthMode(nextMode);
+    setAuthPassword("");
+    setAuthMessage(null);
+    if (currentUser?.email) {
+      setAuthEmail(currentUser.email);
+    }
+    setIsLoginModalOpen(true);
+  }
+
   function navigateToCharacter(
     characterId: string,
     options?: { replace?: boolean }
@@ -386,7 +509,7 @@ export default function App() {
     setIsDeleteModalOpen(false);
   }
 
-  async function handleLogin() {
+  async function handleLocalProfileSave() {
     const name = profileName.trim();
 
     if (!name) return;
@@ -394,6 +517,87 @@ export default function App() {
     await writeSetting("profileName", name);
     setProfileName(name);
     setIsLoginModalOpen(false);
+  }
+
+  async function handleCloudAuthSubmit() {
+    if (!canUseCloud || isCloudActionPending) return;
+
+    const email = authEmail.trim();
+    const password = authPassword;
+    const displayName = authDisplayName.trim();
+
+    if (!email || !password) {
+      setAuthMessage({ kind: "error", text: t.authMissingFields });
+      return;
+    }
+
+    setIsCloudActionPending(true);
+    setAuthMessage({ kind: "info", text: t.cloudWorking });
+
+    try {
+      const deviceId = cloudMetadata?.deviceId ?? (await getOrCreateDeviceId());
+      const response =
+        authMode === "register"
+          ? await registerAccount({
+              email,
+              password,
+              displayName: displayName || undefined,
+              deviceId,
+            })
+          : await login({ email, password, deviceId });
+
+      setCurrentUser(response.user);
+      setProfileName(response.user.displayName || response.user.email);
+      await Promise.all([
+        writeSetting("profileName", response.user.displayName || response.user.email),
+        writeCloudLocalMetadata({ accountHint: response.user.email }),
+      ]);
+      await refreshCloudMetadata();
+      await refreshCloudBackups();
+      setAuthPassword("");
+      setAuthMessage({ kind: "success", text: t.authSuccess });
+      setSettingsMessage({ kind: "success", text: t.authSuccess });
+      setIsLoginModalOpen(false);
+    } catch (error) {
+      console.error(error);
+      setAuthMessage({
+        kind: "error",
+        text: getErrorText(
+          error,
+          authMode === "register" ? t.authRegisterError : t.authLoginError
+        ),
+      });
+    } finally {
+      setIsCloudActionPending(false);
+    }
+  }
+
+  async function handleCloudLogout() {
+    if (!cloudApiConfigured || isCloudActionPending) return;
+
+    setIsCloudActionPending(true);
+
+    try {
+      if (isOnline) {
+        await logoutFromCloud();
+      }
+
+      setCurrentUser(null);
+      setCloudBackups([]);
+      setAuthPassword("");
+      setAuthMessage(null);
+      setSettingsMessage({ kind: "success", text: t.authLogoutSuccess });
+      await writeCloudLocalMetadata({ accountHint: "" });
+      await refreshCloudMetadata();
+    } catch (error) {
+      console.error(error);
+      setSettingsMessage({
+        kind: "error",
+        text: getErrorText(error, t.authLogoutError),
+      });
+    } finally {
+      setIsCloudActionPending(false);
+    }
   }
 
   async function handleExportData() {
@@ -408,6 +612,110 @@ export default function App() {
     }
   }
 
+  async function reloadLocalStateAfterImport(successText: string) {
+    const updatedCloudMetadata = await readCloudLocalMetadata();
+    const storedCharacters = await refreshCharacters();
+    const storedLanguage = await readSetting<Language>("language", language);
+    const storedProfileName = await readSetting<string>("profileName", "");
+    const storedThemePreference = await readSetting<unknown>(
+      VISUAL_PREFERENCE_SETTING_KEYS.theme,
+      DEFAULT_VISUAL_PREFERENCES.theme
+    );
+    const storedClassDecorationsEnabled = await readSetting<unknown>(
+      VISUAL_PREFERENCE_SETTING_KEYS.classDecorationsEnabled,
+      DEFAULT_VISUAL_PREFERENCES.classDecorationsEnabled
+    );
+
+    setLanguage(getSafeLanguage(storedLanguage, language));
+    setThemePreference(getSafeThemePreference(storedThemePreference));
+    setClassDecorationsEnabled(
+      getSafeClassDecorationsEnabled(storedClassDecorationsEnabled)
+    );
+    setCloudMetadata(updatedCloudMetadata);
+    setProfileName(storedProfileName);
+    await selectBestCharacterAfterDataChange(storedCharacters);
+    resetSaveStatus();
+    setSettingsMessage({ kind: "success", text: successText });
+  }
+
+  async function handleSaveCloudBackup() {
+    if (!canUseCloud || !currentUser || isCloudActionPending) return;
+
+    setIsCloudActionPending(true);
+    setSettingsMessage({ kind: "info", text: t.cloudWorking });
+
+    try {
+      const payload = await exportCloudBackupPayload();
+      const response = await createCloudBackup(payload);
+      await recordCloudBackupMetadata({
+        backupId: response.backup.id,
+        backedUpAt: response.backup.createdAt,
+      });
+      await refreshCloudMetadata();
+      await refreshCloudBackups();
+      setSettingsMessage({
+        kind: "success",
+        text: response.skipped ? t.cloudBackupDuplicate : t.cloudBackupSaved,
+      });
+    } catch (error) {
+      console.error(error);
+      setSettingsMessage({
+        kind: "error",
+        text: getErrorText(error, t.cloudSaveBackupError),
+      });
+    } finally {
+      setIsCloudActionPending(false);
+    }
+  }
+
+  async function handleRefreshCloudBackups() {
+    if (!canUseCloud || !currentUser || isCloudActionPending) return;
+
+    setIsCloudActionPending(true);
+
+    try {
+      await refreshCloudBackups();
+      setSettingsMessage({ kind: "success", text: t.cloudBackupsRefreshed });
+    } catch (error) {
+      console.error(error);
+      setSettingsMessage({
+        kind: "error",
+        text: getErrorText(error, t.cloudListBackupsError),
+      });
+    } finally {
+      setIsCloudActionPending(false);
+    }
+  }
+
+  async function handleRestoreLatestCloudBackup() {
+    if (!canUseCloud || !currentUser || isCloudActionPending) return;
+
+    cancelPendingAutosaves();
+    setIsCloudActionPending(true);
+    setSettingsMessage({ kind: "info", text: t.cloudWorking });
+
+    try {
+      const response = await getLatestBackup();
+      const result = await importLocalData(response.backup.payload.payload, {
+        mode: "merge",
+      });
+      await recordCloudRestoreMetadata(response.backup.createdAt);
+      await reloadLocalStateAfterImport(
+        t.cloudRestoreSuccess(result.characters, result.settings)
+      );
+      await refreshCloudMetadata();
+      await refreshCloudBackups();
+    } catch (error) {
+      console.error(error);
+      setSettingsMessage({
+        kind: "error",
+        text: getErrorText(error, t.cloudRestoreError),
+      });
+    } finally {
+      setIsCloudActionPending(false);
+    }
+  }
+
   async function handleImportData(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
 
@@ -419,32 +727,9 @@ export default function App() {
       const content = await file.text();
       const parsed = JSON.parse(content);
       const result = await importLocalData(parsed, { mode: importMode });
-      const updatedCloudMetadata = await readCloudLocalMetadata();
-      const storedCharacters = await refreshCharacters();
-      const storedLanguage = await readSetting<Language>("language", language);
-      const storedProfileName = await readSetting<string>("profileName", "");
-      const storedThemePreference = await readSetting<unknown>(
-        VISUAL_PREFERENCE_SETTING_KEYS.theme,
-        DEFAULT_VISUAL_PREFERENCES.theme
+      await reloadLocalStateAfterImport(
+        t.importSuccess(result.characters, result.settings)
       );
-      const storedClassDecorationsEnabled = await readSetting<unknown>(
-        VISUAL_PREFERENCE_SETTING_KEYS.classDecorationsEnabled,
-        DEFAULT_VISUAL_PREFERENCES.classDecorationsEnabled
-      );
-
-      setLanguage(getSafeLanguage(storedLanguage, language));
-      setThemePreference(getSafeThemePreference(storedThemePreference));
-      setClassDecorationsEnabled(
-        getSafeClassDecorationsEnabled(storedClassDecorationsEnabled)
-      );
-      setCloudMetadata(updatedCloudMetadata);
-      setProfileName(storedProfileName);
-      await selectBestCharacterAfterDataChange(storedCharacters);
-      resetSaveStatus();
-      setSettingsMessage({
-        kind: "success",
-        text: t.importSuccess(result.characters, result.settings),
-      });
     } catch (error) {
       console.error(error);
       setSettingsMessage({ kind: "error", text: t.importError });
@@ -594,9 +879,9 @@ export default function App() {
             <button
               className="button"
               type="button"
-              onClick={() => setIsLoginModalOpen(true)}
+              onClick={() => openLoginModal(currentUser ? "login" : "login")}
             >
-              {profileName || t.login}
+              {signedInLabel || profileName || t.login}
             </button>
           </div>
         </header>
@@ -720,23 +1005,48 @@ export default function App() {
 
               <span
                 className={`cloud-status ${
-                  isOnline && cloudApiConfigured ? "available" : "unavailable"
+                  canUseCloud && currentUser ? "available" : "unavailable"
                 }`}
               >
-                {isOnline
-                  ? cloudApiConfigured
-                    ? t.cloudStatusSignedOut
-                    : t.cloudStatusApiPending
-                  : t.cloudStatusOffline}
+                {!isOnline
+                  ? t.cloudStatusOffline
+                  : !cloudApiConfigured
+                    ? t.cloudStatusApiPending
+                    : isCloudSessionLoading
+                      ? t.cloudStatusCheckingSession
+                      : currentUser
+                        ? t.cloudStatusSignedIn
+                        : t.cloudStatusSignedOut}
               </span>
 
               <div className="cloud-details compact-field">
+                {currentUser && (
+                  <span>
+                    <strong>{t.cloudAccountLabel}</strong>
+                    {signedInLabel}
+                  </span>
+                )}
+
+                {!currentUser && cloudMetadata?.accountHint && (
+                  <span>
+                    <strong>{t.cloudAccountLabel}</strong>
+                    {cloudMetadata.accountHint}
+                  </span>
+                )}
+
                 <span>
                   <strong>{t.cloudLastBackupLabel}</strong>
                   {cloudMetadata?.lastCloudBackupAt
                     ? t.cloudLastBackup(cloudMetadata.lastCloudBackupAt)
                     : t.cloudNeverBackedUp}
                 </span>
+
+                {cloudMetadata?.lastCloudRestoreAt && (
+                  <span>
+                    <strong>{t.cloudLastRestoreLabel}</strong>
+                    {t.cloudLastRestore(cloudMetadata.lastCloudRestoreAt)}
+                  </span>
+                )}
 
                 <span>
                   <strong>{t.cloudDeviceIdLabel}</strong>
@@ -752,22 +1062,87 @@ export default function App() {
               <p className="cloud-help compact-field">
                 {!isOnline
                   ? t.cloudOfflineHelp
-                  : cloudApiConfigured
-                    ? t.cloudLoginRequiredHelp
-                    : t.cloudApiPendingHelp}
+                  : !cloudApiConfigured
+                    ? t.cloudApiPendingHelp
+                    : currentUser
+                      ? t.cloudSignedInHelp
+                      : t.cloudLoginRequiredHelp}
               </p>
 
               <div className="cloud-actions compact-field">
-                <button className="button" type="button" disabled>
-                  {t.cloudLoginComingSoon}
-                </button>
-                <button className="button secondary" type="button" disabled>
-                  {t.cloudSaveBackup}
-                </button>
-                <button className="button secondary" type="button" disabled>
-                  {t.cloudRestoreLatest}
-                </button>
+                {currentUser ? (
+                  <>
+                    <button
+                      className="button"
+                      type="button"
+                      disabled={!canUseCloud || isCloudActionPending}
+                      onClick={handleSaveCloudBackup}
+                    >
+                      {isCloudActionPending ? t.cloudWorking : t.cloudSaveBackup}
+                    </button>
+
+                    <button
+                      className="button secondary"
+                      type="button"
+                      disabled={!canUseCloud || isCloudActionPending}
+                      onClick={handleRestoreLatestCloudBackup}
+                    >
+                      {t.cloudRestoreLatest}
+                    </button>
+
+                    <button
+                      className="button secondary"
+                      type="button"
+                      disabled={!canUseCloud || isCloudActionPending}
+                      onClick={handleRefreshCloudBackups}
+                    >
+                      {t.cloudRefreshBackups}
+                    </button>
+
+                    <button
+                      className="button secondary"
+                      type="button"
+                      disabled={isCloudActionPending}
+                      onClick={handleCloudLogout}
+                    >
+                      {t.logout}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="button"
+                    type="button"
+                    disabled={!canUseCloud || isCloudActionPending}
+                    onClick={() => openLoginModal("login")}
+                  >
+                    {t.authSignIn}
+                  </button>
+                )}
               </div>
+
+              {currentUser && (
+                <div className="cloud-backup-list compact-field">
+                  <strong>{t.cloudBackupListTitle}</strong>
+
+                  {cloudBackups.length === 0 ? (
+                    <span>{t.cloudBackupListEmpty}</span>
+                  ) : (
+                    <ul>
+                      {cloudBackups.slice(0, 5).map((backup) => (
+                        <li key={backup.id}>
+                          <span>{new Date(backup.createdAt).toLocaleString(language)}</span>
+                          <small>
+                            {t.cloudBackupSummary(
+                              backup.characterCount,
+                              backup.sourceAppVersion
+                            )}
+                          </small>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </section>
 
             <section className="settings-section visual-preferences-section">
@@ -968,34 +1343,157 @@ export default function App() {
       {isLoginModalOpen && (
         <div className="modal-backdrop">
           <div className="modal">
-            <h2>{t.loginTitle}</h2>
-            <p className="modal-description">{t.loginDescription}</p>
+            {cloudApiConfigured ? (
+              <>
+                <h2>
+                  {currentUser
+                    ? t.authAccountTitle
+                    : authMode === "register"
+                      ? t.authRegisterTitle
+                      : t.authLoginTitle}
+                </h2>
+                <p className="modal-description">{t.authDescription}</p>
 
-            <label className="field">
-              <span>{t.profileName}</span>
-              <input
-                value={profileName}
-                onChange={(event) => setProfileName(event.target.value)}
-                autoFocus
-              />
-            </label>
+                {authMessage && (
+                  <p className={`settings-message ${authMessage.kind}`} role="status">
+                    {authMessage.text}
+                  </p>
+                )}
 
-            <div className="modal-actions">
-              <button
-                className="button secondary"
-                type="button"
-                onClick={() => setIsLoginModalOpen(false)}
-              >
-                {t.cancel}
-              </button>
+                {currentUser ? (
+                  <div className="settings-summary">
+                    <strong>{t.cloudAccountLabel}</strong>
+                    <span>{signedInLabel}</span>
+                  </div>
+                ) : (
+                  <>
+                    {authMode === "register" && (
+                      <label className="field">
+                        <span>{t.authDisplayName}</span>
+                        <input
+                          value={authDisplayName}
+                          onChange={(event) => setAuthDisplayName(event.target.value)}
+                          autoFocus
+                        />
+                      </label>
+                    )}
 
-              <button className="button" type="button" onClick={handleLogin}>
-                {t.saveLogin}
-              </button>
-            </div>
+                    <label className="field">
+                      <span>{t.authEmail}</span>
+                      <input
+                        type="email"
+                        value={authEmail}
+                        onChange={(event) => setAuthEmail(event.target.value)}
+                        autoFocus={authMode === "login"}
+                        autoComplete="email"
+                      />
+                    </label>
+
+                    <label className="field">
+                      <span>{t.authPassword}</span>
+                      <input
+                        type="password"
+                        value={authPassword}
+                        onChange={(event) => setAuthPassword(event.target.value)}
+                        autoComplete={
+                          authMode === "register" ? "new-password" : "current-password"
+                        }
+                      />
+                    </label>
+
+                    {authMode === "register" && (
+                      <p className="modal-description">{t.authPasswordHelp}</p>
+                    )}
+                  </>
+                )}
+
+                <div className="modal-actions">
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={() => setIsLoginModalOpen(false)}
+                  >
+                    {t.cancel}
+                  </button>
+
+                  {currentUser ? (
+                    <button
+                      className="button danger"
+                      type="button"
+                      disabled={isCloudActionPending}
+                      onClick={handleCloudLogout}
+                    >
+                      {t.logout}
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        className="button secondary"
+                        type="button"
+                        disabled={isCloudActionPending}
+                        onClick={() => {
+                          setAuthMode(authMode === "register" ? "login" : "register");
+                          setAuthMessage(null);
+                        }}
+                      >
+                        {authMode === "register"
+                          ? t.authSwitchToLogin
+                          : t.authSwitchToRegister}
+                      </button>
+
+                      <button
+                        className="button"
+                        type="button"
+                        disabled={!canUseCloud || isCloudActionPending}
+                        onClick={handleCloudAuthSubmit}
+                      >
+                        {isCloudActionPending
+                          ? t.cloudWorking
+                          : authMode === "register"
+                            ? t.authCreateAccount
+                            : t.authSignIn}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <h2>{t.loginTitle}</h2>
+                <p className="modal-description">{t.loginDescription}</p>
+
+                <label className="field">
+                  <span>{t.profileName}</span>
+                  <input
+                    value={profileName}
+                    onChange={(event) => setProfileName(event.target.value)}
+                    autoFocus
+                  />
+                </label>
+
+                <div className="modal-actions">
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={() => setIsLoginModalOpen(false)}
+                  >
+                    {t.cancel}
+                  </button>
+
+                  <button
+                    className="button"
+                    type="button"
+                    onClick={handleLocalProfileSave}
+                  >
+                    {t.saveLogin}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
+
     </div>
   );
 }

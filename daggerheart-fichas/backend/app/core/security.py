@@ -1,3 +1,10 @@
+from __future__ import annotations
+
+import hashlib
+import hmac
+import secrets
+from datetime import UTC, datetime, timedelta
+
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError, VerifyMismatchError
 
@@ -25,3 +32,23 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 def password_hash_needs_rehash(password_hash: str) -> bool:
     return password_hasher.check_needs_rehash(password_hash)
+
+
+def generate_session_token() -> str:
+    return secrets.token_urlsafe(48)
+
+
+def hash_session_token(token: str, secret: str) -> str:
+    return hmac.new(
+        key=secret.encode("utf-8"),
+        msg=token.encode("utf-8"),
+        digestmod=hashlib.sha256,
+    ).hexdigest()
+
+
+def utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
+def expires_after_days(days: int) -> datetime:
+    return utc_now() + timedelta(days=days)

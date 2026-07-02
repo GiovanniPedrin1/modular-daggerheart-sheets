@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.3.0-prep.2" as const;
+export const APP_VERSION = "1.3.0-prep.5" as const;
 export const BACKUP_FORMAT_VERSION = 1 as const;
 export const CLOUD_BACKUP_FORMAT_VERSION = 1 as const;
 export const BUILD_CHANNEL = "prep" as const;
