@@ -97,18 +97,18 @@ export const daggerheartTexts: Record<"pt-BR" | "en-US", DaggerheartTexts> = {
       details: "Detalhes / História",
       progression: "Progressão",
       classExtras: "Extras de Classe",
-      progressionEmptyTitle: "Progressão em preparação",
+      progressionEmptyTitle: "Progressão",
       progressionEmptyDescription:
-        "O guia do personagem e as referências de evolução serão movidos para esta aba na próxima etapa.",
-      classExtrasEmptyTitle: "Extras de classe em preparação",
+        "Guia do personagem, tiers e referências de evolução ficam organizados nesta aba.",
+      classExtrasEmptyTitle: "Extras de classe",
       classExtrasEmptyDescription:
-        "Forma Bestial, Companheiro do Patrulheiro e futuros extras específicos por classe serão organizados aqui.",
+        "Extras específicos de classe aparecem aqui quando existirem para o personagem.",
     },
 
     classExtras: {
       emptyTitle: "Sem extras de classe automáticos",
       emptyDescription:
-        "Esta classe não possui Forma Bestial ou Companheiro do Patrulheiro para exibir automaticamente. Extras manuais e homebrew podem entrar em uma versão futura.",
+        "Esta classe não possui Forma Bestial ou Companheiro do Patrulheiro para exibir automaticamente. Extras manuais e homebrew podem ser adicionados futuramente.",
     },
 
 
@@ -300,18 +300,18 @@ export const daggerheartTexts: Record<"pt-BR" | "en-US", DaggerheartTexts> = {
       details: "Details / Story",
       progression: "Progression",
       classExtras: "Class Extras",
-      progressionEmptyTitle: "Progression in progress",
+      progressionEmptyTitle: "Progression",
       progressionEmptyDescription:
-        "The character guide and advancement references will move into this tab in the next step.",
-      classExtrasEmptyTitle: "Class extras in progress",
+        "Character guide, tiers, and advancement references are organized in this tab.",
+      classExtrasEmptyTitle: "Class extras",
       classExtrasEmptyDescription:
-        "Beastform, Ranger Companion, and future class-specific extras will be organized here.",
+        "Class-specific extras appear here when they exist for the character.",
     },
 
     classExtras: {
       emptyTitle: "No automatic class extras",
       emptyDescription:
-        "This class does not have Beastform or Ranger Companion content to show automatically. Manual and homebrew extras can be added in a future version.",
+        "This class does not have Beastform or Ranger Companion content to show automatically. Manual and homebrew extras can be added later.",
     },
 
 

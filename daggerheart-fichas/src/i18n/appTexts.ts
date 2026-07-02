@@ -5,7 +5,7 @@ export const appTexts = {
     createCharacter: "Criar personagem",
     selectCharacter: "Selecionar personagem",
     language: "Idioma",
-    login: "Login",
+    login: "Conta",
     localProfile: "perfil local",
     logout: "Sair",
     settings: "Configurações",
@@ -14,9 +14,9 @@ export const appTexts = {
     offlineBannerTitle: "Você está offline",
     offlineBannerDescription:
       "O app continua funcionando. Suas alterações seguem sendo salvas neste dispositivo.",
-    loginTitle: "Login",
+    loginTitle: "Conta",
     loginDescription:
-      "Login e sincronização em nuvem serão adicionados em uma versão futura. No momento, seus personagens estão salvos apenas neste dispositivo.",
+      "Entre na sua conta para usar backup manual na nuvem. O app continua funcionando localmente sem login.",
     profileName: "Nome do perfil",
     saveLogin: "Salvar perfil local",
     cancel: "Cancelar",
@@ -37,17 +37,17 @@ export const appTexts = {
     delete: "Apagar",
     deletePrompt: "Para apagar este personagem, digite exatamente:",
     deleteDescription:
-      "Essa ação remove o personagem da lista deste dispositivo. No futuro, será possível recuperar personagens deletados.",
+      "Essa ação remove o personagem da lista deste dispositivo. Exporte um backup antes se quiser manter uma cópia.",
     settingsTitle: "Configurações locais",
     settingsDescription:
-      "Gerencie backups e dados salvos neste navegador. Tudo aqui funciona sem backend ou login.",
+      "Gerencie dados locais, preferências e backups. O app continua funcionando offline; recursos de nuvem são opcionais.",
     cloudTitle: "Nuvem",
     cloudDescription:
-      "Salve uma cópia segura das suas fichas sem deixar de usar o app offline.",
+      "Salve manualmente uma cópia das suas fichas na sua conta sem deixar de usar o app offline.",
     cloudStatusSignedOut: "Login necessário",
     cloudStatusSignedIn: "Conectado",
     cloudStatusCheckingSession: "Verificando sessão",
-    cloudStatusApiPending: "API não configurada",
+    cloudStatusApiPending: "Nuvem indisponível",
     cloudStatusOffline: "Offline",
     cloudSaveBackup: "Salvar backup na nuvem",
     cloudRestoreLatest: "Restaurar último backup",
@@ -65,7 +65,7 @@ export const appTexts = {
     cloudSignedInHelp:
       "Backups são manuais. Suas alterações continuam salvas primeiro neste dispositivo.",
     cloudApiPendingHelp:
-      "Configure VITE_API_BASE_URL no frontend para conectar este app ao backend FastAPI.",
+      "O backup na nuvem não está disponível neste ambiente. Seus dados locais continuam funcionando normalmente.",
     cloudWorking: "Processando...",
     cloudPreparingBackup: "Salvando alterações locais antes do backup...",
     cloudUploadingBackup: "Enviando backup para a nuvem...",
@@ -132,13 +132,13 @@ export const appTexts = {
     authConfirmPasswordPlaceholder: "Digite a senha novamente",
     authDisplayName: "Nome exibido",
     authDisplayNamePlaceholder: "Como você quer aparecer",
-    authPasswordHelp: "Use pelo menos 8 caracteres. A senha é protegida no servidor com Argon2.",
+    authPasswordHelp: "Use pelo menos 8 caracteres. A senha é protegida no servidor e nunca é salva em texto puro.",
     authLocalFirstNotice:
       "Suas fichas continuam salvas localmente e disponíveis offline. A nuvem guarda apenas backups enviados por você.",
     authModeTabsLabel: "Escolher modo de autenticação",
     authNotAvailableTitle: "Nuvem não configurada",
     authNotAvailableDescription:
-      "O backend ainda não está configurado neste ambiente. Você pode salvar um perfil local para identificar este dispositivo.",
+      "O backup na nuvem não está disponível neste ambiente. Você ainda pode salvar um perfil local para identificar este dispositivo.",
     authSignIn: "Entrar",
     authCreateAccount: "Criar conta",
     authSwitchToRegister: "Criar conta",
@@ -211,7 +211,7 @@ export const appTexts = {
     createCharacter: "Create character",
     selectCharacter: "Select character",
     language: "Language",
-    login: "Login",
+    login: "Account",
     localProfile: "local profile",
     logout: "Logout",
     settings: "Settings",
@@ -220,9 +220,9 @@ export const appTexts = {
     offlineBannerTitle: "You are offline",
     offlineBannerDescription:
       "The app keeps working. Your changes continue being saved on this device.",
-    loginTitle: "Login",
+    loginTitle: "Account",
     loginDescription:
-      "Login and cloud sync will be added in a future version. For now, your characters are saved only on this device.",
+      "Sign in to use manual cloud backup. The app keeps working locally without login.",
     profileName: "Profile name",
     saveLogin: "Save local profile",
     cancel: "Cancel",
@@ -243,17 +243,17 @@ export const appTexts = {
     delete: "Delete",
     deletePrompt: "To delete this character, type exactly:",
     deleteDescription:
-      "This removes the character from this device's list. In the future, it will be possible to recover deleted characters.",
+      "This removes the character from this device's list. Export a backup first if you want to keep a copy.",
     settingsTitle: "Local settings",
     settingsDescription:
-      "Manage backups and data saved in this browser. Everything here works without backend or login.",
+      "Manage local data, preferences, and backups. The app keeps working offline; cloud features are optional.",
     cloudTitle: "Cloud",
     cloudDescription:
-      "Save a safe copy of your sheets without losing offline access.",
+      "Manually save a copy of your sheets to your account without losing offline access.",
     cloudStatusSignedOut: "Sign-in required",
     cloudStatusSignedIn: "Signed in",
     cloudStatusCheckingSession: "Checking session",
-    cloudStatusApiPending: "API not configured",
+    cloudStatusApiPending: "Cloud unavailable",
     cloudStatusOffline: "Offline",
     cloudSaveBackup: "Save cloud backup",
     cloudRestoreLatest: "Restore latest backup",
@@ -271,7 +271,7 @@ export const appTexts = {
     cloudSignedInHelp:
       "Backups are manual. Your changes are still saved to this device first.",
     cloudApiPendingHelp:
-      "Set VITE_API_BASE_URL in the frontend to connect this app to the FastAPI backend.",
+      "Cloud backup is not available in this environment. Your local data keeps working normally.",
     cloudWorking: "Working...",
     cloudPreparingBackup: "Saving local changes before backup...",
     cloudUploadingBackup: "Uploading backup to the cloud...",
@@ -324,10 +324,27 @@ export const appTexts = {
     authRegisterTitle: "Create account",
     authDescription:
       "Cloud backup is optional. Your sheets remain available on this device and offline.",
+    authLoginDescription:
+      "Sign in to save manual cloud backups. Local editing keeps working without login.",
+    authRegisterDescription:
+      "Create an account to protect your cloud backups. Your sheets are still saved to this device first.",
+    authSignedInDescription:
+      "Your account is connected. Backups are still manual and optional.",
     authEmail: "Email",
+    authEmailPlaceholder: "you@example.com",
     authPassword: "Password",
+    authPasswordPlaceholder: "Your password",
+    authConfirmPassword: "Confirm password",
+    authConfirmPasswordPlaceholder: "Type your password again",
     authDisplayName: "Display name",
-    authPasswordHelp: "Use at least 8 characters. The password is protected on the server with Argon2.",
+    authDisplayNamePlaceholder: "How you want to appear",
+    authPasswordHelp: "Use at least 8 characters. Your password is protected on the server and is never stored as plain text.",
+    authLocalFirstNotice:
+      "Your sheets remain saved locally and available offline. The cloud stores only backups you send manually.",
+    authModeTabsLabel: "Choose authentication mode",
+    authNotAvailableTitle: "Cloud unavailable",
+    authNotAvailableDescription:
+      "Cloud backup is not available in this environment. You can still save a local profile to identify this device.",
     authSignIn: "Sign in",
     authCreateAccount: "Create account",
     authSwitchToRegister: "Create account",
