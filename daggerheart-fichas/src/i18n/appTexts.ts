@@ -6,6 +6,7 @@ export const appTexts = {
     selectCharacter: "Selecionar personagem",
     language: "Idioma",
     login: "Login",
+    localProfile: "perfil local",
     logout: "Sair",
     settings: "Configurações",
     onlineStatus: "Online",
@@ -66,13 +67,47 @@ export const appTexts = {
     cloudApiPendingHelp:
       "Configure VITE_API_BASE_URL no frontend para conectar este app ao backend FastAPI.",
     cloudWorking: "Processando...",
+    cloudPreparingBackup: "Salvando alterações locais antes do backup...",
+    cloudUploadingBackup: "Enviando backup para a nuvem...",
     cloudBackupSaved: "Backup salvo na nuvem com sucesso.",
+    cloudBackupSavedWithCount: (characters: number) =>
+      `Backup salvo na nuvem com ${characters} personagem(ns).`,
     cloudBackupDuplicate: "O backup mais recente já contém esses dados. Nada novo foi enviado.",
     cloudBackupsRefreshed: "Lista de backups atualizada.",
+    cloudSaveLocalError:
+      "Não foi possível concluir o salvamento local antes do backup. Tente novamente.",
     cloudSaveBackupError: "Não foi possível salvar backup na nuvem.",
     cloudListBackupsError: "Não foi possível carregar a lista de backups.",
+    cloudRestoreLoading: "Carregando backup da nuvem...",
+    cloudRestoreApplying: "Mesclando backup da nuvem com seus dados locais...",
+    cloudRestoreThisBackup: "Restaurar",
+    cloudRestoreMergeTitle: "Restaurar backup em modo mesclar",
+    cloudRestoreMergeDescription:
+      "Revise o backup antes de mesclar. Este modo adiciona/atualiza dados do backup sem apagar os dados locais que não estiverem nele.",
+    cloudRestoreRemoteBackup: "Backup na nuvem",
+    cloudRestoreLocalData: "Dados locais atuais",
+    cloudRestoreMergeKeepsLocal:
+      "Personagens locais que não existem no backup continuam neste dispositivo.",
+    cloudRestoreMergeNotice:
+      "A restauração em modo mesclar não apaga seus dados locais. Metadados deste dispositivo e da conta atual serão preservados.",
+    cloudRestoreMergeConfirm: "Mesclar backup",
+    cloudRestoreReplaceStart: "Substituir dados locais",
+    cloudRestoreReplaceTitle: "Substituir dados locais por backup da nuvem",
+    cloudRestoreReplaceDescription:
+      "Este modo apaga os dados locais deste dispositivo e importa o conteúdo do backup selecionado.",
+    cloudRestoreReplaceRemovesLocal:
+      "Personagens locais que não existem no backup serão removidos deste dispositivo.",
+    cloudRestoreReplaceWarning:
+      "Atenção: esta ação substitui os personagens e configurações locais. Exporte um backup local antes de continuar se quiser manter uma cópia.",
+    cloudRestoreExportLocalFirst: "Exportar backup local antes",
+    cloudRestoreReplacePrompt: "Para confirmar, digite exatamente:",
+    cloudRestoreReplaceToken: "SUBSTITUIR",
+    cloudRestoreReplaceConfirm: "Substituir dados locais",
+    cloudRestoreReplaceApplying: "Substituindo dados locais pelo backup da nuvem...",
     cloudRestoreSuccess: (characters: number, settings: number) =>
       `Backup restaurado em modo mesclar: ${characters} personagem(ns) e ${settings} configuração(ões).`,
+    cloudRestoreReplaceSuccess: (characters: number, settings: number) =>
+      `Backup restaurado em modo substituir: ${characters} personagem(ns) e ${settings} configuração(ões).`,
     cloudRestoreError: "Não foi possível restaurar o backup da nuvem.",
     cloudBackupListTitle: "Backups recentes",
     cloudBackupListEmpty: "Nenhum backup encontrado nesta conta.",
@@ -83,15 +118,35 @@ export const appTexts = {
     authRegisterTitle: "Criar conta",
     authDescription:
       "Backup na nuvem é opcional. Suas fichas continuam disponíveis neste dispositivo e offline.",
+    authLoginDescription:
+      "Entre para salvar backups manuais na nuvem. A edição local continua funcionando sem login.",
+    authRegisterDescription:
+      "Crie uma conta para proteger seus backups na nuvem. Suas fichas continuam salvas primeiro neste dispositivo.",
+    authSignedInDescription:
+      "Sua conta está conectada. Backups continuam sendo uma ação manual e opcional.",
     authEmail: "Email",
+    authEmailPlaceholder: "voce@email.com",
     authPassword: "Senha",
+    authPasswordPlaceholder: "Sua senha",
+    authConfirmPassword: "Confirmar senha",
+    authConfirmPasswordPlaceholder: "Digite a senha novamente",
     authDisplayName: "Nome exibido",
+    authDisplayNamePlaceholder: "Como você quer aparecer",
     authPasswordHelp: "Use pelo menos 8 caracteres. A senha é protegida no servidor com Argon2.",
+    authLocalFirstNotice:
+      "Suas fichas continuam salvas localmente e disponíveis offline. A nuvem guarda apenas backups enviados por você.",
+    authModeTabsLabel: "Escolher modo de autenticação",
+    authNotAvailableTitle: "Nuvem não configurada",
+    authNotAvailableDescription:
+      "O backend ainda não está configurado neste ambiente. Você pode salvar um perfil local para identificar este dispositivo.",
     authSignIn: "Entrar",
     authCreateAccount: "Criar conta",
     authSwitchToRegister: "Criar conta",
     authSwitchToLogin: "Já tenho conta",
     authMissingFields: "Preencha email e senha.",
+    authEmailInvalid: "Digite um email válido.",
+    authPasswordTooShort: "A senha precisa ter pelo menos 8 caracteres.",
+    authPasswordMismatch: "As senhas não conferem.",
     authSuccess: "Sessão iniciada com sucesso.",
     authLoginError: "Não foi possível entrar na conta.",
     authRegisterError: "Não foi possível criar a conta.",
@@ -157,6 +212,7 @@ export const appTexts = {
     selectCharacter: "Select character",
     language: "Language",
     login: "Login",
+    localProfile: "local profile",
     logout: "Logout",
     settings: "Settings",
     onlineStatus: "Online",
@@ -217,13 +273,47 @@ export const appTexts = {
     cloudApiPendingHelp:
       "Set VITE_API_BASE_URL in the frontend to connect this app to the FastAPI backend.",
     cloudWorking: "Working...",
+    cloudPreparingBackup: "Saving local changes before backup...",
+    cloudUploadingBackup: "Uploading backup to the cloud...",
     cloudBackupSaved: "Cloud backup saved successfully.",
+    cloudBackupSavedWithCount: (characters: number) =>
+      `Cloud backup saved with ${characters} character(s).`,
     cloudBackupDuplicate: "The latest backup already contains this data. Nothing new was uploaded.",
     cloudBackupsRefreshed: "Backup list refreshed.",
+    cloudSaveLocalError:
+      "Could not finish the local save before backup. Try again.",
     cloudSaveBackupError: "Could not save cloud backup.",
     cloudListBackupsError: "Could not load the backup list.",
+    cloudRestoreLoading: "Loading cloud backup...",
+    cloudRestoreApplying: "Merging cloud backup with your local data...",
+    cloudRestoreThisBackup: "Restore",
+    cloudRestoreMergeTitle: "Restore backup in merge mode",
+    cloudRestoreMergeDescription:
+      "Review the backup before merging. This mode adds/updates data from the backup without deleting local data that is not in it.",
+    cloudRestoreRemoteBackup: "Cloud backup",
+    cloudRestoreLocalData: "Current local data",
+    cloudRestoreMergeKeepsLocal:
+      "Local characters that do not exist in the backup remain on this device.",
+    cloudRestoreMergeNotice:
+      "Merge restore does not delete your local data. This device's metadata and current account hint will be preserved.",
+    cloudRestoreMergeConfirm: "Merge backup",
+    cloudRestoreReplaceStart: "Replace local data",
+    cloudRestoreReplaceTitle: "Replace local data with cloud backup",
+    cloudRestoreReplaceDescription:
+      "This mode deletes the local data on this device and imports the selected backup contents.",
+    cloudRestoreReplaceRemovesLocal:
+      "Local characters that do not exist in the backup will be removed from this device.",
+    cloudRestoreReplaceWarning:
+      "Warning: this action replaces local characters and settings. Export a local backup before continuing if you want to keep a copy.",
+    cloudRestoreExportLocalFirst: "Export local backup first",
+    cloudRestoreReplacePrompt: "To confirm, type exactly:",
+    cloudRestoreReplaceToken: "REPLACE",
+    cloudRestoreReplaceConfirm: "Replace local data",
+    cloudRestoreReplaceApplying: "Replacing local data with the cloud backup...",
     cloudRestoreSuccess: (characters: number, settings: number) =>
       `Backup restored in merge mode: ${characters} character(s) and ${settings} setting(s).`,
+    cloudRestoreReplaceSuccess: (characters: number, settings: number) =>
+      `Backup restored in replace mode: ${characters} character(s) and ${settings} setting(s).`,
     cloudRestoreError: "Could not restore the cloud backup.",
     cloudBackupListTitle: "Recent backups",
     cloudBackupListEmpty: "No backup found for this account.",
@@ -243,6 +333,9 @@ export const appTexts = {
     authSwitchToRegister: "Create account",
     authSwitchToLogin: "I already have an account",
     authMissingFields: "Fill in email and password.",
+    authEmailInvalid: "Enter a valid email address.",
+    authPasswordTooShort: "Password must be at least 8 characters.",
+    authPasswordMismatch: "Passwords do not match.",
     authSuccess: "Signed in successfully.",
     authLoginError: "Could not sign in.",
     authRegisterError: "Could not create the account.",

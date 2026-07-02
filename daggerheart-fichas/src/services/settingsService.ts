@@ -90,13 +90,12 @@ export async function readCloudLocalMetadata(): Promise<CloudLocalMetadata> {
 }
 
 export async function writeCloudLocalMetadata(
-  metadata: Partial<Omit<CloudLocalMetadata, "deviceId">>
+  metadata: Partial<CloudLocalMetadata>
 ) {
   await Promise.all(
     Object.entries(metadata).map(([key, value]) => {
-      const settingKey = CLOUD_METADATA_SETTING_KEYS[
-        key as keyof Omit<typeof CLOUD_METADATA_SETTING_KEYS, "deviceId">
-      ];
+      const settingKey =
+        CLOUD_METADATA_SETTING_KEYS[key as keyof typeof CLOUD_METADATA_SETTING_KEYS];
 
       return writeSetting(settingKey, value ?? "");
     })

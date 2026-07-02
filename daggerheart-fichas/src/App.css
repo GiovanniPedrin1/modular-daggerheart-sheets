@@ -665,3 +665,251 @@ textarea {
 .cloud-backup-list small {
   color: var(--app-muted);
 }
+
+.account-button {
+  max-width: 260px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.account-button.signed-in {
+  border-color: var(--app-success-border);
+  background: var(--app-success-bg);
+  color: var(--app-success);
+}
+
+.account-dot {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.7;
+}
+
+.account-button-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-message.info {
+  border: 1px solid var(--app-warning-border);
+  background: var(--app-warning-bg);
+  color: var(--app-warning);
+}
+
+.auth-modal {
+  width: min(100%, 520px);
+}
+
+.auth-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.auth-header h2 {
+  margin-bottom: 0;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--app-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.auth-mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 18px;
+  padding: 4px;
+  border: 1px solid var(--app-border-soft);
+  border-radius: 14px;
+  background: var(--app-surface-muted);
+}
+
+.auth-mode-tabs button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--app-muted);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.auth-mode-tabs button.active {
+  background: var(--app-surface);
+  color: var(--app-text);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+}
+
+.auth-form {
+  display: block;
+}
+
+.auth-form input[aria-invalid="true"] {
+  border-color: var(--app-danger);
+  outline-color: var(--app-danger);
+}
+
+.auth-notice {
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--app-border);
+  border-radius: 12px;
+  background: var(--app-surface-muted);
+  color: var(--app-muted);
+  line-height: 1.45;
+}
+
+.auth-account-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+}
+
+.auth-account-avatar {
+  width: 48px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--app-success-border);
+  border-radius: 999px;
+  background: var(--app-success-bg);
+  color: var(--app-success);
+  font-weight: 900;
+}
+
+.auth-account-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
+
+.auth-account-main strong,
+.auth-account-main span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-account-main strong {
+  color: var(--app-text);
+}
+
+.auth-account-main span {
+  color: var(--app-muted);
+}
+
+.auth-meta-list {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+  margin: 4px 0 0;
+}
+
+.auth-meta-list div {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--app-border-soft);
+  border-radius: 12px;
+  background: var(--app-surface-muted);
+}
+
+.auth-meta-list dt {
+  color: var(--app-text);
+  font-weight: 800;
+}
+
+.auth-meta-list dd {
+  margin: 0;
+  overflow: hidden;
+  color: var(--app-muted);
+  text-overflow: ellipsis;
+}
+
+.auth-meta-list code {
+  color: var(--app-muted);
+}
+
+.auth-account-card .auth-notice,
+.auth-account-card .auth-actions {
+  grid-column: 1 / -1;
+}
+
+.auth-actions {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 720px) {
+  .auth-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .auth-actions {
+    flex-direction: column-reverse;
+  }
+}
+
+.restore-modal {
+  max-width: 620px;
+}
+
+.restore-preview-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin: 1rem 0;
+}
+
+.restore-preview-card > div {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.9rem;
+  border: 1px solid var(--app-border);
+  border-radius: 14px;
+  background: var(--app-muted-surface);
+}
+
+.restore-preview-card span {
+  color: var(--app-text);
+}
+
+.restore-preview-card small {
+  color: var(--app-muted-text);
+}
+
+.text-button {
+  align-self: flex-start;
+  padding: 0.25rem 0.45rem;
+  min-height: auto;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 680px) {
+  .restore-preview-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+.restore-confirm-field {
+  margin-top: 1rem;
+}
+
+.restore-confirm-field .delete-confirm-name {
+  margin: 0;
+}

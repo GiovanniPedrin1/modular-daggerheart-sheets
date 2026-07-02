@@ -32,7 +32,6 @@ import {
   readCloudLocalMetadata,
   readSetting,
   recordCloudBackupMetadata,
-  recordCloudRestoreMetadata,
   writeCloudLocalMetadata,
   writeSetting,
   type CloudLocalMetadata,
@@ -55,9 +54,11 @@ import {
 } from "./services/authService";
 import {
   createBackup as createCloudBackup,
+  getBackup,
   getLatestBackup,
   listBackups,
   type CloudBackup,
+  type CloudBackupWithPayload,
 } from "./services/cloudBackupService";
 import { SheetRenderer } from "./sheets/registry";
 import type { DaggerheartClassKey, Language } from "./sheets/daggerheart/types";
@@ -88,6 +89,10 @@ export default function App() {
   );
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
   const [cloudBackups, setCloudBackups] = useState<CloudBackup[]>([]);
+  const [pendingRestoreBackup, setPendingRestoreBackup] =
+    useState<CloudBackupWithPayload | null>(null);
+  const [isRestoreMergeModalOpen, setIsRestoreMergeModalOpen] = useState(false);
+  const [isRestoreReplaceModalOpen, setIsRestoreReplaceModalOpen] = useState(false);
   const [isCloudSessionLoading, setIsCloudSessionLoading] = useState(false);
   const [isCloudActionPending, setIsCloudActionPending] = useState(false);
   const [characters, setCharacters] = useState<CharacterRecord[]>([]);
@@ -108,6 +113,7 @@ export default function App() {
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
+  const [authPasswordConfirmation, setAuthPasswordConfirmation] = useState("");
   const [authDisplayName, setAuthDisplayName] = useState("");
   const [authMessage, setAuthMessage] = useState<AuthMessage>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -115,6 +121,7 @@ export default function App() {
   const [importMode, setImportMode] = useState<ImportMode>("merge");
   const [settingsMessage, setSettingsMessage] = useState<SettingsMessage>(null);
   const [clearConfirmation, setClearConfirmation] = useState("");
+  const [restoreReplaceConfirmation, setRestoreReplaceConfirmation] = useState("");
 
   const t = appTexts[language];
   const isOnline = useOnlineStatus();
@@ -122,6 +129,22 @@ export default function App() {
   const appVersionLabel = getAppVersionLabel();
   const canUseCloud = isOnline && cloudApiConfigured;
   const signedInLabel = currentUser?.displayName || currentUser?.email || "";
+  const accountButtonLabel = currentUser
+    ? signedInLabel
+    : profileName
+      ? `${profileName} · ${t.localProfile}`
+      : t.login;
+  const authEmailIsValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+    authEmail.trim()
+  );
+  const authPasswordIsLongEnough = authPassword.length >= 8;
+  const authPasswordsMatch = authPassword === authPasswordConfirmation;
+  const canSubmitAuthForm =
+    canUseCloud &&
+    !isCloudActionPending &&
+    authEmailIsValid &&
+    authPasswordIsLongEnough &&
+    (authMode === "login" || authPasswordsMatch);
 
   const selectedCharacter = useMemo(() => {
     return characters.find((character) => character.id === selectedCharacterId);
@@ -133,6 +156,7 @@ export default function App() {
     markSelectedCharacterEditing,
     releaseSelectedCharacterEditing,
     cancelPendingAutosaves,
+    flushPendingAutosaves,
     resetSaveStatus,
   } = useCharacterAutosave({
     selectedCharacter,
@@ -166,6 +190,8 @@ export default function App() {
     deleteConfirmationName.trim() === selectedCharacter?.name;
 
   const canClearLocalData = clearConfirmation.trim() === t.clearDataToken;
+  const canConfirmRestoreReplace =
+    restoreReplaceConfirmation.trim() === t.cloudRestoreReplaceToken;
   const shouldShowSettingsModal = isSettingsModalOpen || isSettingsRoute;
 
   useEffect(() => {
@@ -416,9 +442,31 @@ export default function App() {
     return response.backups;
   }
 
+  function closeRestoreMergeModal() {
+    setIsRestoreMergeModalOpen(false);
+    setPendingRestoreBackup(null);
+  }
+
+  function openRestoreReplaceModal() {
+    setRestoreReplaceConfirmation("");
+    setIsRestoreMergeModalOpen(false);
+    setIsRestoreReplaceModalOpen(true);
+  }
+
+  function closeRestoreReplaceModal() {
+    setRestoreReplaceConfirmation("");
+    setIsRestoreReplaceModalOpen(false);
+    setPendingRestoreBackup(null);
+  }
+
+  function getBackupDateLabel(date: string) {
+    return new Date(date).toLocaleString(language);
+  }
+
   function openLoginModal(nextMode: AuthMode = "login") {
     setAuthMode(nextMode);
     setAuthPassword("");
+    setAuthPasswordConfirmation("");
     setAuthMessage(null);
     if (currentUser?.email) {
       setAuthEmail(currentUser.email);
@@ -531,6 +579,21 @@ export default function App() {
       return;
     }
 
+    if (!authEmailIsValid) {
+      setAuthMessage({ kind: "error", text: t.authEmailInvalid });
+      return;
+    }
+
+    if (!authPasswordIsLongEnough) {
+      setAuthMessage({ kind: "error", text: t.authPasswordTooShort });
+      return;
+    }
+
+    if (authMode === "register" && !authPasswordsMatch) {
+      setAuthMessage({ kind: "error", text: t.authPasswordMismatch });
+      return;
+    }
+
     setIsCloudActionPending(true);
     setAuthMessage({ kind: "info", text: t.cloudWorking });
 
@@ -555,6 +618,7 @@ export default function App() {
       await refreshCloudMetadata();
       await refreshCloudBackups();
       setAuthPassword("");
+      setAuthPasswordConfirmation("");
       setAuthMessage({ kind: "success", text: t.authSuccess });
       setSettingsMessage({ kind: "success", text: t.authSuccess });
       setIsLoginModalOpen(false);
@@ -585,6 +649,7 @@ export default function App() {
       setCurrentUser(null);
       setCloudBackups([]);
       setAuthPassword("");
+      setAuthPasswordConfirmation("");
       setAuthMessage(null);
       setSettingsMessage({ kind: "success", text: t.authLogoutSuccess });
       await writeCloudLocalMetadata({ accountHint: "" });
@@ -642,9 +707,19 @@ export default function App() {
     if (!canUseCloud || !currentUser || isCloudActionPending) return;
 
     setIsCloudActionPending(true);
-    setSettingsMessage({ kind: "info", text: t.cloudWorking });
+    setSettingsMessage({ kind: "info", text: t.cloudPreparingBackup });
 
     try {
+      const localSaveSucceeded = await flushPendingAutosaves();
+
+      if (!localSaveSucceeded) {
+        setSettingsMessage({ kind: "error", text: t.cloudSaveLocalError });
+        return;
+      }
+
+      await refreshCharacters();
+      setSettingsMessage({ kind: "info", text: t.cloudUploadingBackup });
+
       const payload = await exportCloudBackupPayload();
       const response = await createCloudBackup(payload);
       await recordCloudBackupMetadata({
@@ -655,7 +730,9 @@ export default function App() {
       await refreshCloudBackups();
       setSettingsMessage({
         kind: "success",
-        text: response.skipped ? t.cloudBackupDuplicate : t.cloudBackupSaved,
+        text: response.skipped
+          ? t.cloudBackupDuplicate
+          : t.cloudBackupSavedWithCount(response.backup.characterCount),
       });
     } catch (error) {
       console.error(error);
@@ -687,21 +764,125 @@ export default function App() {
     }
   }
 
-  async function handleRestoreLatestCloudBackup() {
+  async function handlePrepareRestoreLatestCloudBackup() {
     if (!canUseCloud || !currentUser || isCloudActionPending) return;
 
-    cancelPendingAutosaves();
     setIsCloudActionPending(true);
-    setSettingsMessage({ kind: "info", text: t.cloudWorking });
+    setSettingsMessage({ kind: "info", text: t.cloudRestoreLoading });
 
     try {
       const response = await getLatestBackup();
-      const result = await importLocalData(response.backup.payload.payload, {
+      setPendingRestoreBackup(response.backup);
+      setIsRestoreMergeModalOpen(true);
+      setSettingsMessage(null);
+    } catch (error) {
+      console.error(error);
+      setSettingsMessage({
+        kind: "error",
+        text: getErrorText(error, t.cloudRestoreError),
+      });
+    } finally {
+      setIsCloudActionPending(false);
+    }
+  }
+
+  async function handlePrepareRestoreCloudBackup(backupId: string) {
+    if (!canUseCloud || !currentUser || isCloudActionPending) return;
+
+    setIsCloudActionPending(true);
+    setSettingsMessage({ kind: "info", text: t.cloudRestoreLoading });
+
+    try {
+      const response = await getBackup(backupId);
+      setPendingRestoreBackup(response.backup);
+      setIsRestoreMergeModalOpen(true);
+      setSettingsMessage(null);
+    } catch (error) {
+      console.error(error);
+      setSettingsMessage({
+        kind: "error",
+        text: getErrorText(error, t.cloudRestoreError),
+      });
+    } finally {
+      setIsCloudActionPending(false);
+    }
+  }
+
+  async function handleConfirmRestoreMerge() {
+    if (!pendingRestoreBackup || !canUseCloud || !currentUser || isCloudActionPending) {
+      return;
+    }
+
+    cancelPendingAutosaves();
+    setIsCloudActionPending(true);
+    setSettingsMessage({ kind: "info", text: t.cloudRestoreApplying });
+
+    try {
+      const preservedCloudMetadata = await readCloudLocalMetadata();
+      const result = await importLocalData(pendingRestoreBackup.payload.payload, {
         mode: "merge",
       });
-      await recordCloudRestoreMetadata(response.backup.createdAt);
+
+      const restoredAt = new Date().toISOString();
+
+      await writeCloudLocalMetadata({
+        deviceId: preservedCloudMetadata.deviceId,
+        accountHint: currentUser.email || preservedCloudMetadata.accountHint || "",
+        lastCloudBackupId: preservedCloudMetadata.lastCloudBackupId || "",
+        lastCloudBackupAt: preservedCloudMetadata.lastCloudBackupAt || "",
+        lastCloudRestoreAt: restoredAt,
+      });
+
+      closeRestoreMergeModal();
       await reloadLocalStateAfterImport(
         t.cloudRestoreSuccess(result.characters, result.settings)
+      );
+      await refreshCloudMetadata();
+      await refreshCloudBackups();
+    } catch (error) {
+      console.error(error);
+      setSettingsMessage({
+        kind: "error",
+        text: getErrorText(error, t.cloudRestoreError),
+      });
+    } finally {
+      setIsCloudActionPending(false);
+    }
+  }
+
+  async function handleConfirmRestoreReplace() {
+    if (
+      !pendingRestoreBackup ||
+      !canUseCloud ||
+      !currentUser ||
+      isCloudActionPending ||
+      !canConfirmRestoreReplace
+    ) {
+      return;
+    }
+
+    cancelPendingAutosaves();
+    setIsCloudActionPending(true);
+    setSettingsMessage({ kind: "info", text: t.cloudRestoreReplaceApplying });
+
+    try {
+      const preservedCloudMetadata = await readCloudLocalMetadata();
+      const result = await importLocalData(pendingRestoreBackup.payload.payload, {
+        mode: "replace",
+      });
+      const restoredAt = new Date().toISOString();
+
+      await writeCloudLocalMetadata({
+        deviceId: preservedCloudMetadata.deviceId,
+        accountHint: currentUser.email || preservedCloudMetadata.accountHint || "",
+        lastCloudBackupId: preservedCloudMetadata.lastCloudBackupId || "",
+        lastCloudBackupAt: preservedCloudMetadata.lastCloudBackupAt || "",
+        lastCloudRestoreAt: restoredAt,
+      });
+
+      closeRestoreReplaceModal();
+      await reloadLocalStateAfterImport(
+        t.cloudRestoreReplaceSuccess(result.characters, result.settings)
       );
       await refreshCloudMetadata();
       await refreshCloudBackups();
@@ -877,11 +1058,13 @@ export default function App() {
             </select>
 
             <button
-              className="button"
+              className={`button account-button ${currentUser ? "signed-in" : ""}`}
               type="button"
-              onClick={() => openLoginModal(currentUser ? "login" : "login")}
+              onClick={() => openLoginModal("login")}
+              title={currentUser ? t.authAccountTitle : t.authLoginTitle}
             >
-              {signedInLabel || profileName || t.login}
+              <span className="account-dot" aria-hidden="true" />
+              <span className="account-button-label">{accountButtonLabel}</span>
             </button>
           </div>
         </header>
@@ -1085,7 +1268,7 @@ export default function App() {
                       className="button secondary"
                       type="button"
                       disabled={!canUseCloud || isCloudActionPending}
-                      onClick={handleRestoreLatestCloudBackup}
+                      onClick={handlePrepareRestoreLatestCloudBackup}
                     >
                       {t.cloudRestoreLatest}
                     </button>
@@ -1109,14 +1292,25 @@ export default function App() {
                     </button>
                   </>
                 ) : (
-                  <button
-                    className="button"
-                    type="button"
-                    disabled={!canUseCloud || isCloudActionPending}
-                    onClick={() => openLoginModal("login")}
-                  >
-                    {t.authSignIn}
-                  </button>
+                  <>
+                    <button
+                      className="button"
+                      type="button"
+                      disabled={!canUseCloud || isCloudActionPending}
+                      onClick={() => openLoginModal("login")}
+                    >
+                      {t.authSignIn}
+                    </button>
+
+                    <button
+                      className="button secondary"
+                      type="button"
+                      disabled={!canUseCloud || isCloudActionPending}
+                      onClick={() => openLoginModal("register")}
+                    >
+                      {t.authCreateAccount}
+                    </button>
+                  </>
                 )}
               </div>
 
@@ -1130,13 +1324,21 @@ export default function App() {
                     <ul>
                       {cloudBackups.slice(0, 5).map((backup) => (
                         <li key={backup.id}>
-                          <span>{new Date(backup.createdAt).toLocaleString(language)}</span>
+                          <span>{getBackupDateLabel(backup.createdAt)}</span>
                           <small>
                             {t.cloudBackupSummary(
                               backup.characterCount,
                               backup.sourceAppVersion
                             )}
                           </small>
+                          <button
+                            className="button text-button"
+                            type="button"
+                            disabled={!canUseCloud || isCloudActionPending}
+                            onClick={() => handlePrepareRestoreCloudBackup(backup.id)}
+                          >
+                            {t.cloudRestoreThisBackup}
+                          </button>
                         </li>
                       ))}
                     </ul>
@@ -1340,19 +1542,186 @@ export default function App() {
         </div>
       )}
 
+      {isRestoreMergeModalOpen && pendingRestoreBackup && (
+        <div className="modal-backdrop">
+          <div className="modal restore-modal">
+            <h2>{t.cloudRestoreMergeTitle}</h2>
+            <p className="modal-description">{t.cloudRestoreMergeDescription}</p>
+
+            <div className="restore-preview-card">
+              <div>
+                <strong>{t.cloudRestoreRemoteBackup}</strong>
+                <span>{getBackupDateLabel(pendingRestoreBackup.createdAt)}</span>
+                <small>
+                  {t.cloudBackupSummary(
+                    pendingRestoreBackup.characterCount,
+                    pendingRestoreBackup.sourceAppVersion
+                  )}
+                </small>
+              </div>
+
+              <div>
+                <strong>{t.cloudRestoreLocalData}</strong>
+                <span>{t.currentSummary(characters.length)}</span>
+                <small>{t.cloudRestoreMergeKeepsLocal}</small>
+              </div>
+            </div>
+
+            <p className="settings-message info">
+              {t.cloudRestoreMergeNotice}
+            </p>
+
+            <div className="modal-actions">
+              <button
+                className="button secondary"
+                type="button"
+                disabled={isCloudActionPending}
+                onClick={closeRestoreMergeModal}
+              >
+                {t.cancel}
+              </button>
+
+              <button
+                className="button danger"
+                type="button"
+                disabled={isCloudActionPending}
+                onClick={openRestoreReplaceModal}
+              >
+                {t.cloudRestoreReplaceStart}
+              </button>
+
+              <button
+                className="button"
+                type="button"
+                disabled={isCloudActionPending}
+                onClick={handleConfirmRestoreMerge}
+              >
+                {isCloudActionPending ? t.cloudWorking : t.cloudRestoreMergeConfirm}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isRestoreReplaceModalOpen && pendingRestoreBackup && (
+        <div className="modal-backdrop">
+          <div className="modal restore-modal">
+            <h2>{t.cloudRestoreReplaceTitle}</h2>
+            <p className="modal-description">{t.cloudRestoreReplaceDescription}</p>
+
+            <div className="restore-preview-card">
+              <div>
+                <strong>{t.cloudRestoreRemoteBackup}</strong>
+                <span>{getBackupDateLabel(pendingRestoreBackup.createdAt)}</span>
+                <small>
+                  {t.cloudBackupSummary(
+                    pendingRestoreBackup.characterCount,
+                    pendingRestoreBackup.sourceAppVersion
+                  )}
+                </small>
+              </div>
+
+              <div>
+                <strong>{t.cloudRestoreLocalData}</strong>
+                <span>{t.currentSummary(characters.length)}</span>
+                <small>{t.cloudRestoreReplaceRemovesLocal}</small>
+              </div>
+            </div>
+
+            <p className="settings-message error">
+              {t.cloudRestoreReplaceWarning}
+            </p>
+
+            <button
+              className="button secondary"
+              type="button"
+              disabled={isCloudActionPending}
+              onClick={handleExportData}
+            >
+              {t.cloudRestoreExportLocalFirst}
+            </button>
+
+            <label className="field restore-confirm-field">
+              <span>{t.cloudRestoreReplacePrompt}</span>
+              <strong className="delete-confirm-name">
+                {t.cloudRestoreReplaceToken}
+              </strong>
+              <input
+                value={restoreReplaceConfirmation}
+                onChange={(event) =>
+                  setRestoreReplaceConfirmation(event.target.value)
+                }
+                autoFocus
+                placeholder={t.cloudRestoreReplaceToken}
+              />
+            </label>
+
+            <div className="modal-actions">
+              <button
+                className="button secondary"
+                type="button"
+                disabled={isCloudActionPending}
+                onClick={closeRestoreReplaceModal}
+              >
+                {t.cancel}
+              </button>
+
+              <button
+                className="button danger"
+                type="button"
+                disabled={isCloudActionPending || !canConfirmRestoreReplace}
+                onClick={handleConfirmRestoreReplace}
+              >
+                {isCloudActionPending ? t.cloudWorking : t.cloudRestoreReplaceConfirm}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isLoginModalOpen && (
         <div className="modal-backdrop">
-          <div className="modal">
+          <div className="modal auth-modal">
             {cloudApiConfigured ? (
               <>
-                <h2>
+                <div className="auth-header">
+                  <div>
+                    <p className="eyebrow">{t.cloudTitle}</p>
+                    <h2>
+                      {currentUser
+                        ? t.authAccountTitle
+                        : authMode === "register"
+                          ? t.authRegisterTitle
+                          : t.authLoginTitle}
+                    </h2>
+                  </div>
+
+                  <span
+                    className={`cloud-status ${currentUser ? "available" : "unavailable"}`}
+                  >
+                    {!isOnline
+                      ? t.cloudStatusOffline
+                      : isCloudSessionLoading
+                        ? t.cloudStatusCheckingSession
+                        : currentUser
+                          ? t.cloudStatusSignedIn
+                          : t.cloudStatusSignedOut}
+                  </span>
+                </div>
+
+                <p className="modal-description">
                   {currentUser
-                    ? t.authAccountTitle
+                    ? t.authSignedInDescription
                     : authMode === "register"
-                      ? t.authRegisterTitle
-                      : t.authLoginTitle}
-                </h2>
-                <p className="modal-description">{t.authDescription}</p>
+                      ? t.authRegisterDescription
+                      : t.authLoginDescription}
+                </p>
+
+                {!isOnline && (
+                  <p className="settings-message info" role="status">
+                    {t.cloudOfflineHelp}
+                  </p>
+                )}
 
                 {authMessage && (
                   <p className={`settings-message ${authMessage.kind}`} role="status">
@@ -1361,106 +1730,187 @@ export default function App() {
                 )}
 
                 {currentUser ? (
-                  <div className="settings-summary">
-                    <strong>{t.cloudAccountLabel}</strong>
-                    <span>{signedInLabel}</span>
-                  </div>
-                ) : (
-                  <>
-                    {authMode === "register" && (
-                      <label className="field">
-                        <span>{t.authDisplayName}</span>
-                        <input
-                          value={authDisplayName}
-                          onChange={(event) => setAuthDisplayName(event.target.value)}
-                          autoFocus
-                        />
-                      </label>
-                    )}
+                  <div className="auth-account-card">
+                    <div className="auth-account-avatar" aria-hidden="true">
+                      {(currentUser.displayName || currentUser.email)
+                        .slice(0, 1)
+                        .toUpperCase()}
+                    </div>
 
-                    <label className="field">
-                      <span>{t.authEmail}</span>
-                      <input
-                        type="email"
-                        value={authEmail}
-                        onChange={(event) => setAuthEmail(event.target.value)}
-                        autoFocus={authMode === "login"}
-                        autoComplete="email"
-                      />
-                    </label>
+                    <div className="auth-account-main">
+                      <strong>{signedInLabel}</strong>
+                      <span>{currentUser.email}</span>
+                    </div>
 
-                    <label className="field">
-                      <span>{t.authPassword}</span>
-                      <input
-                        type="password"
-                        value={authPassword}
-                        onChange={(event) => setAuthPassword(event.target.value)}
-                        autoComplete={
-                          authMode === "register" ? "new-password" : "current-password"
-                        }
-                      />
-                    </label>
+                    <dl className="auth-meta-list">
+                      <div>
+                        <dt>{t.cloudLastBackupLabel}</dt>
+                        <dd>
+                          {cloudMetadata?.lastCloudBackupAt
+                            ? t.cloudLastBackup(cloudMetadata.lastCloudBackupAt)
+                            : t.cloudNeverBackedUp}
+                        </dd>
+                      </div>
 
-                    {authMode === "register" && (
-                      <p className="modal-description">{t.authPasswordHelp}</p>
-                    )}
-                  </>
-                )}
+                      <div>
+                        <dt>{t.cloudDeviceIdLabel}</dt>
+                        <dd>
+                          <code>{cloudMetadata?.deviceId ?? t.loading}</code>
+                        </dd>
+                      </div>
+                    </dl>
 
-                <div className="modal-actions">
-                  <button
-                    className="button secondary"
-                    type="button"
-                    onClick={() => setIsLoginModalOpen(false)}
-                  >
-                    {t.cancel}
-                  </button>
+                    <p className="auth-notice">{t.authLocalFirstNotice}</p>
 
-                  {currentUser ? (
-                    <button
-                      className="button danger"
-                      type="button"
-                      disabled={isCloudActionPending}
-                      onClick={handleCloudLogout}
-                    >
-                      {t.logout}
-                    </button>
-                  ) : (
-                    <>
+                    <div className="modal-actions auth-actions">
                       <button
                         className="button secondary"
                         type="button"
-                        disabled={isCloudActionPending}
-                        onClick={() => {
-                          setAuthMode(authMode === "register" ? "login" : "register");
-                          setAuthMessage(null);
-                        }}
+                        onClick={() => setIsLoginModalOpen(false)}
                       >
-                        {authMode === "register"
-                          ? t.authSwitchToLogin
-                          : t.authSwitchToRegister}
+                        {t.close}
                       </button>
 
                       <button
-                        className="button"
+                        className="button danger"
                         type="button"
-                        disabled={!canUseCloud || isCloudActionPending}
-                        onClick={handleCloudAuthSubmit}
+                        disabled={isCloudActionPending}
+                        onClick={handleCloudLogout}
                       >
-                        {isCloudActionPending
-                          ? t.cloudWorking
-                          : authMode === "register"
-                            ? t.authCreateAccount
-                            : t.authSignIn}
+                        {isCloudActionPending ? t.cloudWorking : t.logout}
                       </button>
-                    </>
-                  )}
-                </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="auth-mode-tabs" role="tablist" aria-label={t.authModeTabsLabel}>
+                      <button
+                        className={authMode === "login" ? "active" : ""}
+                        type="button"
+                        role="tab"
+                        aria-selected={authMode === "login"}
+                        onClick={() => {
+                          setAuthMode("login");
+                          setAuthMessage(null);
+                        }}
+                      >
+                        {t.authSignIn}
+                      </button>
+
+                      <button
+                        className={authMode === "register" ? "active" : ""}
+                        type="button"
+                        role="tab"
+                        aria-selected={authMode === "register"}
+                        onClick={() => {
+                          setAuthMode("register");
+                          setAuthMessage(null);
+                        }}
+                      >
+                        {t.authCreateAccount}
+                      </button>
+                    </div>
+
+                    <form
+                      className="auth-form"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        handleCloudAuthSubmit();
+                      }}
+                    >
+                      {authMode === "register" && (
+                        <label className="field">
+                          <span>{t.authDisplayName}</span>
+                          <input
+                            value={authDisplayName}
+                            onChange={(event) => setAuthDisplayName(event.target.value)}
+                            autoFocus
+                            autoComplete="name"
+                            placeholder={t.authDisplayNamePlaceholder}
+                          />
+                        </label>
+                      )}
+
+                      <label className="field">
+                        <span>{t.authEmail}</span>
+                        <input
+                          type="email"
+                          value={authEmail}
+                          onChange={(event) => setAuthEmail(event.target.value)}
+                          autoFocus={authMode === "login"}
+                          autoComplete="email"
+                          placeholder={t.authEmailPlaceholder}
+                          aria-invalid={authEmail.length > 0 && !authEmailIsValid}
+                        />
+                      </label>
+
+                      <label className="field">
+                        <span>{t.authPassword}</span>
+                        <input
+                          type="password"
+                          value={authPassword}
+                          onChange={(event) => setAuthPassword(event.target.value)}
+                          autoComplete={
+                            authMode === "register" ? "new-password" : "current-password"
+                          }
+                          placeholder={t.authPasswordPlaceholder}
+                          aria-invalid={authPassword.length > 0 && !authPasswordIsLongEnough}
+                        />
+                      </label>
+
+                      {authMode === "register" && (
+                        <label className="field">
+                          <span>{t.authConfirmPassword}</span>
+                          <input
+                            type="password"
+                            value={authPasswordConfirmation}
+                            onChange={(event) =>
+                              setAuthPasswordConfirmation(event.target.value)
+                            }
+                            autoComplete="new-password"
+                            placeholder={t.authConfirmPasswordPlaceholder}
+                            aria-invalid={
+                              authPasswordConfirmation.length > 0 && !authPasswordsMatch
+                            }
+                          />
+                        </label>
+                      )}
+
+                      <p className="auth-notice">
+                        {authMode === "register"
+                          ? t.authPasswordHelp
+                          : t.authLocalFirstNotice}
+                      </p>
+
+                      <div className="modal-actions auth-actions">
+                        <button
+                          className="button secondary"
+                          type="button"
+                          onClick={() => setIsLoginModalOpen(false)}
+                        >
+                          {t.cancel}
+                        </button>
+
+                        <button
+                          className="button"
+                          type="submit"
+                          disabled={!canSubmitAuthForm}
+                        >
+                          {isCloudActionPending
+                            ? t.cloudWorking
+                            : authMode === "register"
+                              ? t.authCreateAccount
+                              : t.authSignIn}
+                        </button>
+                      </div>
+                    </form>
+                  </>
+                )}
               </>
             ) : (
               <>
-                <h2>{t.loginTitle}</h2>
-                <p className="modal-description">{t.loginDescription}</p>
+                <h2>{t.authNotAvailableTitle}</h2>
+                <p className="modal-description">{t.authNotAvailableDescription}</p>
 
                 <label className="field">
                   <span>{t.profileName}</span>

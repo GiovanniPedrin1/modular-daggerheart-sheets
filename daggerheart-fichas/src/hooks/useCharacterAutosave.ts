@@ -57,8 +57,8 @@ export function useCharacterAutosave({
   const autosaveRequestCounterRef = useRef(0);
   const onOptimisticCharacterChangeRef = useRef(onOptimisticCharacterChange);
   const onSavedCharacterRef = useRef(onSavedCharacter);
-  const performAutosaveRef = useRef<(pending: PendingAutosave) => Promise<void>>(
-    async () => {}
+  const performAutosaveRef = useRef<(pending: PendingAutosave) => Promise<boolean>>(
+    async () => true
   );
 
   useEffect(() => {
@@ -119,12 +119,12 @@ export function useCharacterAutosave({
     };
   }, []);
 
-  async function performAutosave(pending: PendingAutosave) {
+  async function performAutosave(pending: PendingAutosave): Promise<boolean> {
     const latestRequestId = latestAutosaveRequestRef.current.get(
       pending.characterId
     );
 
-    if (latestRequestId !== pending.requestId) return;
+    if (latestRequestId !== pending.requestId) return true;
 
     if (selectedCharacterIdRef.current === pending.characterId) {
       setSaveStatus("saving");
@@ -141,18 +141,20 @@ export function useCharacterAutosave({
         latestAutosaveRequestRef.current.get(pending.characterId) !==
         pending.requestId
       ) {
-        return;
+        return true;
       }
 
       pendingAutosavesRef.current.delete(pending.characterId);
 
-      if (!mountedRef.current) return;
+      if (!mountedRef.current) return true;
 
       onSavedCharacterRef.current(updated);
 
       if (selectedCharacterIdRef.current === pending.characterId) {
         setSaveStatus("saved");
       }
+
+      return true;
     } catch (error) {
       console.error(error);
 
@@ -163,6 +165,8 @@ export function useCharacterAutosave({
       ) {
         setSaveStatus("error");
       }
+
+      return false;
     }
   }
 
@@ -256,6 +260,26 @@ export function useCharacterAutosave({
     }
   }
 
+  async function flushPendingAutosaves() {
+    autosaveTimersRef.current.forEach((timer) => clearTimeout(timer));
+    autosaveTimersRef.current.clear();
+    editingReleaseTimersRef.current.forEach((timer) => clearTimeout(timer));
+    editingReleaseTimersRef.current.clear();
+    activeEditingCharactersRef.current.clear();
+
+    const pendingAutosaves = Array.from(pendingAutosavesRef.current.values());
+
+    if (pendingAutosaves.length === 0) {
+      return true;
+    }
+
+    const results = await Promise.all(
+      pendingAutosaves.map((pending) => performAutosaveRef.current(pending))
+    );
+
+    return results.every(Boolean);
+  }
+
   function cancelPendingAutosaves(characterId?: string) {
     if (characterId) {
       const timer = autosaveTimersRef.current.get(characterId);
@@ -340,6 +364,7 @@ export function useCharacterAutosave({
     markSelectedCharacterEditing,
     releaseSelectedCharacterEditing,
     cancelPendingAutosaves,
+    flushPendingAutosaves,
     resetSaveStatus: useCallback(() => setSaveStatus("idle"), []),
   };
 }
