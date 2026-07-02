@@ -1,4 +1,4 @@
-const APP_VERSION = '1.2.3-stable-pwa';
+import { APP_VERSION, BUILD_CHANNEL, CACHE_VERSION } from './config/appVersion';
 
 function activateWaitingWorker(registration) {
   if (registration.waiting) {
@@ -47,6 +47,8 @@ export function registerAppServiceWorker() {
       });
 
       window.__DAGGERHEART_APP_VERSION__ = APP_VERSION;
+      window.__DAGGERHEART_BUILD_CHANNEL__ = BUILD_CHANNEL;
+      window.__DAGGERHEART_CACHE_VERSION__ = CACHE_VERSION;
 
       watchForUpdates(registration);
       activateWaitingWorker(registration);

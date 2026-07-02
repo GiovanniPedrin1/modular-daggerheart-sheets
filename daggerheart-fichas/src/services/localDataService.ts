@@ -1,4 +1,10 @@
+import {
+  APP_VERSION,
+  BACKUP_FORMAT_VERSION,
+  CLOUD_BACKUP_FORMAT_VERSION,
+} from "../config/appVersion";
 import { db, type CharacterRecord, type CharacterSystem, type SettingRecord } from "../db/localDb";
+import { getOrCreateDeviceId } from "./settingsService";
 import type { DaggerheartClassKey, Language } from "../sheets/daggerheart/types";
 import {
   normalizeDaggerheartCharacterData,
@@ -6,10 +12,20 @@ import {
 
 export type BackupFile = {
   app: "rpg-sheets-local-first";
-  formatVersion: 1;
+  formatVersion: typeof BACKUP_FORMAT_VERSION;
   exportedAt: string;
   characters: CharacterRecord[];
   settings: SettingRecord[];
+};
+
+export type CloudBackupPayload = {
+  app: "daggerheart-fichas";
+  cloudFormatVersion: typeof CLOUD_BACKUP_FORMAT_VERSION;
+  sourceAppVersion: string;
+  exportedAt: string;
+  deviceId: string;
+  checksum: string;
+  payload: BackupFile;
 };
 
 export type ImportMode = "merge" | "replace";
@@ -27,11 +43,68 @@ export async function exportLocalData(): Promise<BackupFile> {
 
   return {
     app: "rpg-sheets-local-first",
-    formatVersion: 1,
+    formatVersion: BACKUP_FORMAT_VERSION,
     exportedAt: new Date().toISOString(),
     characters,
     settings,
   };
+}
+
+export async function exportCloudBackupPayload(): Promise<CloudBackupPayload> {
+  const [payload, deviceId] = await Promise.all([
+    exportLocalData(),
+    getOrCreateDeviceId(),
+  ]);
+  const checksum = await calculateSha256Checksum(payload);
+
+  return {
+    app: "daggerheart-fichas",
+    cloudFormatVersion: CLOUD_BACKUP_FORMAT_VERSION,
+    sourceAppVersion: APP_VERSION,
+    exportedAt: payload.exportedAt,
+    deviceId,
+    checksum,
+    payload,
+  };
+}
+
+export async function calculateSha256Checksum(value: unknown) {
+  if (
+    typeof crypto === "undefined" ||
+    !crypto.subtle ||
+    typeof crypto.subtle.digest !== "function"
+  ) {
+    throw new Error("CRYPTO_UNAVAILABLE");
+  }
+
+  const normalizedPayload = stableStringify(value);
+  const bytes = new TextEncoder().encode(normalizedPayload);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", bytes);
+
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+export function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+
+  if (Array.isArray(value)) {
+    return `[${value
+      .map((item) => stableStringify(item) ?? "null")
+      .join(",")}]`;
+  }
+
+  const record = value as Record<string, unknown>;
+  const entries = Object.entries(record)
+    .filter(([, item]) => item !== undefined && typeof item !== "function")
+    .sort(([left], [right]) => left.localeCompare(right));
+
+  return `{${entries
+    .map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`)
+    .join(",")}}`;
 }
 
 export async function importLocalData(
@@ -90,7 +163,10 @@ function parseBackupFile(data: unknown): BackupFile {
     throw new Error("INVALID_BACKUP");
   }
 
-  if (data.app !== "rpg-sheets-local-first" || data.formatVersion !== 1) {
+  if (
+    data.app !== "rpg-sheets-local-first" ||
+    data.formatVersion !== BACKUP_FORMAT_VERSION
+  ) {
     throw new Error("UNSUPPORTED_BACKUP_VERSION");
   }
 
@@ -107,7 +183,7 @@ function parseBackupFile(data: unknown): BackupFile {
 
   return {
     app: "rpg-sheets-local-first",
-    formatVersion: 1,
+    formatVersion: BACKUP_FORMAT_VERSION,
     exportedAt,
     characters,
     settings,

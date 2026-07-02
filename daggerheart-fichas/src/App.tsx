@@ -1,6 +1,7 @@
 import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import { useLocation, useMatch, useNavigate } from "react-router-dom";
 import "./App.css";
+import { getAppVersionLabel } from "./config/appVersion";
 import { useCharacterAutosave } from "./hooks/useCharacterAutosave";
 import { useOnlineStatus } from "./hooks/useOnlineStatus";
 import { appTexts, getSafeLanguage } from "./i18n/appTexts";
@@ -19,12 +20,18 @@ import {
   importLocalData,
   type ImportMode,
 } from "./services/localDataService";
+import { isCloudApiConfigured } from "./services/apiClient";
 import {
   getCharacterRoutePath,
   getDecodedRouteParam,
   getInitialRouteCharacterId,
 } from "./services/routing";
-import { readSetting, writeSetting } from "./services/settingsService";
+import {
+  readCloudLocalMetadata,
+  readSetting,
+  writeSetting,
+  type CloudLocalMetadata,
+} from "./services/settingsService";
 import {
   DEFAULT_VISUAL_PREFERENCES,
   VISUAL_PREFERENCE_SETTING_KEYS,
@@ -56,6 +63,9 @@ export default function App() {
   const [classDecorationsEnabled, setClassDecorationsEnabled] = useState(
     DEFAULT_VISUAL_PREFERENCES.classDecorationsEnabled
   );
+  const [cloudMetadata, setCloudMetadata] = useState<CloudLocalMetadata | null>(
+    null
+  );
   const [characters, setCharacters] = useState<CharacterRecord[]>([]);
   const [selectedCharacterId, setSelectedCharacterId] = useState("");
 
@@ -79,6 +89,8 @@ export default function App() {
 
   const t = appTexts[language];
   const isOnline = useOnlineStatus();
+  const cloudApiConfigured = isCloudApiConfigured();
+  const appVersionLabel = getAppVersionLabel();
 
   const selectedCharacter = useMemo(() => {
     return characters.find((character) => character.id === selectedCharacterId);
@@ -130,6 +142,8 @@ export default function App() {
 
     async function boot() {
       try {
+        const initialCloudMetadata = await readCloudLocalMetadata();
+
         const [
           storedLanguage,
           storedLastCharacterId,
@@ -163,6 +177,7 @@ export default function App() {
         setLanguage(safeLanguage);
         setThemePreference(safeThemePreference);
         setClassDecorationsEnabled(safeClassDecorationsEnabled);
+        setCloudMetadata(initialCloudMetadata);
         setProfileName(storedProfileName);
         setCharacters(storedCharacters);
 
@@ -404,6 +419,7 @@ export default function App() {
       const content = await file.text();
       const parsed = JSON.parse(content);
       const result = await importLocalData(parsed, { mode: importMode });
+      const updatedCloudMetadata = await readCloudLocalMetadata();
       const storedCharacters = await refreshCharacters();
       const storedLanguage = await readSetting<Language>("language", language);
       const storedProfileName = await readSetting<string>("profileName", "");
@@ -421,6 +437,7 @@ export default function App() {
       setClassDecorationsEnabled(
         getSafeClassDecorationsEnabled(storedClassDecorationsEnabled)
       );
+      setCloudMetadata(updatedCloudMetadata);
       setProfileName(storedProfileName);
       await selectBestCharacterAfterDataChange(storedCharacters);
       resetSaveStatus();
@@ -442,12 +459,14 @@ export default function App() {
     try {
       cancelPendingAutosaves();
       await clearLocalData();
+      const nextCloudMetadata = await readCloudLocalMetadata();
       setCharacters([]);
       setSelectedCharacterId("");
       if (!isSettingsRoute) {
         navigate("/");
       }
       setProfileName("");
+      setCloudMetadata(nextCloudMetadata);
       setThemePreference(DEFAULT_VISUAL_PREFERENCES.theme);
       setClassDecorationsEnabled(
         DEFAULT_VISUAL_PREFERENCES.classDecorationsEnabled
@@ -692,6 +711,64 @@ export default function App() {
                 {settingsMessage.text}
               </p>
             )}
+
+            <section className="settings-section cloud-settings-section">
+              <div>
+                <h3>{t.cloudTitle}</h3>
+                <p>{t.cloudDescription}</p>
+              </div>
+
+              <span
+                className={`cloud-status ${
+                  isOnline && cloudApiConfigured ? "available" : "unavailable"
+                }`}
+              >
+                {isOnline
+                  ? cloudApiConfigured
+                    ? t.cloudStatusSignedOut
+                    : t.cloudStatusApiPending
+                  : t.cloudStatusOffline}
+              </span>
+
+              <div className="cloud-details compact-field">
+                <span>
+                  <strong>{t.cloudLastBackupLabel}</strong>
+                  {cloudMetadata?.lastCloudBackupAt
+                    ? t.cloudLastBackup(cloudMetadata.lastCloudBackupAt)
+                    : t.cloudNeverBackedUp}
+                </span>
+
+                <span>
+                  <strong>{t.cloudDeviceIdLabel}</strong>
+                  <code>{cloudMetadata?.deviceId ?? t.loading}</code>
+                </span>
+
+                <span>
+                  <strong>{t.appVersion}</strong>
+                  {appVersionLabel}
+                </span>
+              </div>
+
+              <p className="cloud-help compact-field">
+                {!isOnline
+                  ? t.cloudOfflineHelp
+                  : cloudApiConfigured
+                    ? t.cloudLoginRequiredHelp
+                    : t.cloudApiPendingHelp}
+              </p>
+
+              <div className="cloud-actions compact-field">
+                <button className="button" type="button" disabled>
+                  {t.cloudLoginComingSoon}
+                </button>
+                <button className="button secondary" type="button" disabled>
+                  {t.cloudSaveBackup}
+                </button>
+                <button className="button secondary" type="button" disabled>
+                  {t.cloudRestoreLatest}
+                </button>
+              </div>
+            </section>
 
             <section className="settings-section visual-preferences-section">
               <div>

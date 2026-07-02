@@ -3,11 +3,11 @@ import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
 import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
+import { APP_VERSION, CACHE_VERSION } from './config/appVersion';
 
-const APP_VERSION = '1.2.3-stable-pwa';
-const APP_SHELL_CACHE = `daggerheart-app-shell-${APP_VERSION}`;
-const IMAGE_CACHE = `daggerheart-images-${APP_VERSION}`;
-const MANIFEST_CACHE = `daggerheart-manifest-${APP_VERSION}`;
+const APP_SHELL_CACHE = `${CACHE_VERSION}-app-shell`;
+const IMAGE_CACHE = `${CACHE_VERSION}-images`;
+const MANIFEST_CACHE = `${CACHE_VERSION}-manifest`;
 const INDEX_URL = '/index.html';
 
 setCacheNameDetails({
@@ -28,7 +28,10 @@ self.addEventListener('message', (event) => {
 function shouldDeleteCache(cacheName) {
   const normalized = cacheName.toLowerCase();
 
-  if (normalized.includes(APP_VERSION.toLowerCase())) {
+  if (
+    normalized.includes(APP_VERSION.toLowerCase()) ||
+    normalized.includes(CACHE_VERSION.toLowerCase())
+  ) {
     return false;
   }
 

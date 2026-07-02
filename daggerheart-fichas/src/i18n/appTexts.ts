@@ -40,6 +40,25 @@ export const appTexts = {
     settingsTitle: "Configurações locais",
     settingsDescription:
       "Gerencie backups e dados salvos neste navegador. Tudo aqui funciona sem backend ou login.",
+    cloudTitle: "Nuvem",
+    cloudDescription:
+      "Backup na nuvem será opcional. Suas fichas continuam salvas neste dispositivo e funcionando offline.",
+    cloudStatusSignedOut: "Login necessário",
+    cloudStatusApiPending: "Em preparação",
+    cloudStatusOffline: "Offline",
+    cloudLoginComingSoon: "Login em breve",
+    cloudSaveBackup: "Salvar backup na nuvem",
+    cloudRestoreLatest: "Restaurar último backup",
+    cloudLastBackupLabel: "Último backup",
+    cloudNeverBackedUp: "Nenhum backup na nuvem ainda.",
+    cloudLastBackup: (date: string) => `Último backup: ${new Date(date).toLocaleString("pt-BR")}`,
+    cloudDeviceIdLabel: "Dispositivo",
+    cloudOfflineHelp: "Conecte-se à internet para usar backup na nuvem quando ele estiver disponível.",
+    cloudLoginRequiredHelp:
+      "A API está configurada, mas login e backup manual entram na próxima fase.",
+    cloudApiPendingHelp:
+      "Contratos de API já estão preparados. O backend real será conectado na Fase 2.1.",
+    appVersion: "Versão do app",
     visualPreferences: "Preferências visuais",
     visualPreferencesDescription:
       "Ajuste tema e opções visuais salvas localmente neste dispositivo.",
@@ -132,6 +151,25 @@ export const appTexts = {
     settingsTitle: "Local settings",
     settingsDescription:
       "Manage backups and data saved in this browser. Everything here works without backend or login.",
+    cloudTitle: "Cloud",
+    cloudDescription:
+      "Cloud backup will be optional. Your sheets remain saved on this device and keep working offline.",
+    cloudStatusSignedOut: "Sign-in required",
+    cloudStatusApiPending: "In preparation",
+    cloudStatusOffline: "Offline",
+    cloudLoginComingSoon: "Sign in coming soon",
+    cloudSaveBackup: "Save cloud backup",
+    cloudRestoreLatest: "Restore latest backup",
+    cloudLastBackupLabel: "Last backup",
+    cloudNeverBackedUp: "No cloud backup yet.",
+    cloudLastBackup: (date: string) => `Last backup: ${new Date(date).toLocaleString("en-US")}`,
+    cloudDeviceIdLabel: "Device",
+    cloudOfflineHelp: "Connect to the internet to use cloud backup when it is available.",
+    cloudLoginRequiredHelp:
+      "The API is configured, but login and manual backup are coming in the next phase.",
+    cloudApiPendingHelp:
+      "API contracts are ready. The real backend will be connected in Phase 2.1.",
+    appVersion: "App version",
     visualPreferences: "Visual preferences",
     visualPreferencesDescription:
       "Adjust theme and visual options saved locally on this device.",

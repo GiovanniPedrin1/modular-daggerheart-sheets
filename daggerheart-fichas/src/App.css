@@ -543,3 +543,89 @@ textarea {
 .visual-preferences-section {
   border-top: 0;
 }
+
+.cloud-settings-section {
+  align-items: start;
+}
+
+.cloud-status {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--app-warning-border);
+  border-radius: 999px;
+  background: var(--app-warning-bg);
+  color: var(--app-warning);
+  font-size: 0.85rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.cloud-status.available {
+  border-color: var(--app-success-border);
+  background: var(--app-success-bg);
+  color: var(--app-success);
+}
+
+.cloud-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cloud-details span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--app-border-soft);
+  border-radius: 12px;
+  background: var(--app-surface-muted);
+  color: var(--app-muted);
+  line-height: 1.35;
+}
+
+.cloud-details strong {
+  color: var(--app-text);
+  font-size: 0.85rem;
+}
+
+.cloud-details code {
+  overflow: hidden;
+  color: var(--app-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cloud-help {
+  padding: 10px 12px;
+  border: 1px dashed var(--app-border);
+  border-radius: 12px;
+  background: var(--app-surface-muted);
+}
+
+.cloud-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+@media (max-width: 720px) {
+  .cloud-status {
+    justify-self: stretch;
+    justify-content: center;
+  }
+
+  .cloud-details {
+    grid-template-columns: 1fr;
+  }
+
+  .cloud-actions {
+    flex-direction: column;
+  }
+}
