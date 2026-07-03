@@ -186,6 +186,11 @@ export type DaggerheartTexts = {
   marks3Hp: string;
   hp: string;
   stress: string;
+  trackerMax: string;
+  increaseMaxHp: string;
+  decreaseMaxHp: string;
+  increaseMaxStress: string;
+  decreaseMaxStress: string;
 
   hope: string;
   hopeHint: string;

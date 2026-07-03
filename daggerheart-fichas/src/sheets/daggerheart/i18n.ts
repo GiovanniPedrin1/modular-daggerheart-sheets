@@ -35,6 +35,11 @@ export const daggerheartTexts: Record<"pt-BR" | "en-US", DaggerheartTexts> = {
     marks3Hp: "Marca 3 PV",
     hp: "PV",
     stress: "Estresse",
+    trackerMax: "Máx.",
+    increaseMaxHp: "Aumentar PV máximo",
+    decreaseMaxHp: "Reduzir PV máximo",
+    increaseMaxStress: "Aumentar Estresse máximo",
+    decreaseMaxStress: "Reduzir Estresse máximo",
 
     hope: "Esperança",
     hopeHint: "Gaste Esperança para usar uma experiência ou ajudar um aliado.",
@@ -238,6 +243,11 @@ export const daggerheartTexts: Record<"pt-BR" | "en-US", DaggerheartTexts> = {
     marks3Hp: "Mark 3 HP",
     hp: "HP",
     stress: "Stress",
+    trackerMax: "Max.",
+    increaseMaxHp: "Increase maximum HP",
+    decreaseMaxHp: "Decrease maximum HP",
+    increaseMaxStress: "Increase maximum Stress",
+    decreaseMaxStress: "Decrease maximum Stress",
 
     hope: "Hope",
     hopeHint: "Spend Hope to use an experience or help an ally.",

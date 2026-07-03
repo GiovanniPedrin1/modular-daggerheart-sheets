@@ -26,6 +26,14 @@ import {
   type DaggerheartCharacterData,
 } from "./utils/formData";
 import { normalizeDetailsPage } from "./utils/detailsPage";
+import {
+  MAX_TRACKER_MAX,
+  getInitialTrackerMaxes,
+  getTrackerMaxFieldName,
+  parseTrackerMax,
+  type TrackerMaxes,
+  type TrackerName,
+} from "./utils/trackerMax";
 
 type Character = {
   id: string;
@@ -67,6 +75,8 @@ export function DaggerheartSheet({
   );
   const initialDetailsPage = normalizeDetailsPage(initialData?.detailsPage);
   const initialDetailsSnapshot = JSON.stringify(initialDetailsPage);
+  const initialHpMax = initialFields.hp_max;
+  const initialStressMax = initialFields.stress_max;
 
   const formRef = useRef<HTMLFormElement | null>(null);
   const activeTypingKeysRef = useRef(new Set<string>());
@@ -84,6 +94,9 @@ export function DaggerheartSheet({
   const [activeTab, setActiveTab] = useState<ActiveTab>("sheet");
   const [detailsPage, setDetailsPage] =
     useState<DaggerheartDetailsPage>(initialDetailsPage);
+  const [trackerMaxes, setTrackerMaxes] = useState<TrackerMaxes>(() =>
+    getInitialTrackerMaxes({ hp_max: initialHpMax, stress_max: initialStressMax })
+  );
 
   useEffect(() => {
     if (!formRef.current) return;
@@ -94,6 +107,12 @@ export function DaggerheartSheet({
     // porque abas desmontadas remontam campos não controlados.
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, character.id, language]);
+
+  useEffect(() => {
+    setTrackerMaxes(
+      getInitialTrackerMaxes({ hp_max: initialHpMax, stress_max: initialStressMax })
+    );
+  }, [character.id, initialHpMax, initialStressMax]);
 
   useEffect(() => {
     detailsPageRef.current = detailsPage;
@@ -242,6 +261,33 @@ export function DaggerheartSheet({
     );
   }
 
+  function handleTrackerMaxChange(name: TrackerName, nextMax: number) {
+    const currentMax = trackerMaxes[name];
+    const clampedMax = parseTrackerMax(nextMax);
+
+    if (clampedMax === currentMax) return;
+
+    markEditingStarted();
+    setTrackerMaxes((current) => ({ ...current, [name]: clampedMax }));
+
+    if (!onSheetDataChange) {
+      markEditingEndedSoon();
+      return;
+    }
+
+    const patch = buildSheetDataPatch();
+    patch[getTrackerMaxFieldName(name)] = String(clampedMax);
+
+    if (clampedMax < currentMax) {
+      for (let index = clampedMax + 1; index <= MAX_TRACKER_MAX; index += 1) {
+        patch[`${name}_${index}`] = false;
+      }
+    }
+
+    onSheetDataChange(patch);
+    markEditingEndedSoon();
+  }
+
   return (
     <form
       ref={formRef}
@@ -320,7 +366,11 @@ export function DaggerheartSheet({
           <div className="dh-grid-2">
             <div className="dh-stack">
               <SummarySection t={t} evasionStart={definition.evasionStart} />
-              <DamageHealthSection t={t} />
+              <DamageHealthSection
+                t={t}
+                trackerMaxes={trackerMaxes}
+                onTrackerMaxChange={handleTrackerMaxChange}
+              />
               <HopeSection t={t} language={language} feature={definition.hopeFeature} />
               <ExperiencesSection t={t} />
               <GoldSection t={t} />

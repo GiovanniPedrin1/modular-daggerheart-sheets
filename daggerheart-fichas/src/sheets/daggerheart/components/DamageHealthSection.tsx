@@ -1,13 +1,20 @@
 import type { DaggerheartTexts } from "../types";
+import type { TrackerMaxes, TrackerName } from "../utils/trackerMax";
+import { AdjustableTrackerRow } from "./AdjustableTrackerRow";
 import { Field } from "./Field";
 import { SectionCard } from "./SectionCard";
-import { Tracker } from "./Tracker";
 
 type DamageHealthSectionProps = {
   t: DaggerheartTexts;
+  trackerMaxes: TrackerMaxes;
+  onTrackerMaxChange: (name: TrackerName, nextMax: number) => void;
 };
 
-export function DamageHealthSection({ t }: DamageHealthSectionProps) {
+export function DamageHealthSection({
+  t,
+  trackerMaxes,
+  onTrackerMaxChange,
+}: DamageHealthSectionProps) {
   return (
     <SectionCard title={t.damageHealth} innerClassName="dh-stack">
       <p className="dh-hint" style={{ margin: 0 }}>{t.damageThresholdHint}</p>
@@ -28,14 +35,20 @@ export function DamageHealthSection({ t }: DamageHealthSectionProps) {
       </div>
 
       <div className="dh-tracker-wrap">
-        <div className="dh-tracker-line">
-          <div className="dh-tracker-label">{t.hp}</div>
-          <Tracker name="hp" count={12} />
-        </div>
-        <div className="dh-tracker-line">
-          <div className="dh-tracker-label">{t.stress}</div>
-          <Tracker name="stress" count={12} />
-        </div>
+        <AdjustableTrackerRow
+          name="hp"
+          label={t.hp}
+          max={trackerMaxes.hp}
+          onMaxChange={onTrackerMaxChange}
+          t={t}
+        />
+        <AdjustableTrackerRow
+          name="stress"
+          label={t.stress}
+          max={trackerMaxes.stress}
+          onMaxChange={onTrackerMaxChange}
+          t={t}
+        />
       </div>
     </SectionCard>
   );
