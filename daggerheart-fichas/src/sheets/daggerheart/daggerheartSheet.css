@@ -633,7 +633,7 @@
 
 .dh-tier-option {
   display: grid;
-  grid-template-columns: 24px 1fr;
+  grid-template-columns: max-content 1fr;
   gap: 8px;
   align-items: start;
   font-size: 0.9rem;
@@ -642,10 +642,21 @@
   letter-spacing: 0;
 }
 
+.dh-tier-option-boxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 20px;
+}
+
 .dh-tier-option input {
   width: 20px;
   height: 20px;
   accent-color: var(--dh-brand-fill);
+}
+
+.dh-tier-option label {
+  cursor: pointer;
 }
 
 details.dh-card summary {
@@ -981,6 +992,10 @@ textarea.dh-companion-image-box {
 
 .dh-details-story-textarea {
   min-height: 220px !important;
+}
+
+#details-foundation-casting-attribute{
+  max-width: 160px !important;
 }
 
 @media (max-width: 1040px) {
