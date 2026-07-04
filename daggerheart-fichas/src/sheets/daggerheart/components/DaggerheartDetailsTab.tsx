@@ -179,6 +179,7 @@ export function DaggerheartDetailsTab({
                 <TextAreaField
                   id="details-ancestry-second"
                   name="detailsPage.abilities.ancestry.second"
+                  className="dh-details-medium-textarea"
                   label={t.details.ancestrySecond}
                   placeholder={t.details.abilityPlaceholder}
                   value={details.abilities.ancestry.second}

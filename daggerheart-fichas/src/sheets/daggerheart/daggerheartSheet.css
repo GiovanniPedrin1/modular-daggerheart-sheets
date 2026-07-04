@@ -983,11 +983,10 @@ textarea.dh-companion-image-box {
 
 #details-foundation-text{
   min-height: 280px !important;
-
 }
 
 .dh-details-medium-textarea {
-  min-height: 160px !important;
+  min-height: 140px !important;
 }
 
 .dh-details-story-textarea {
