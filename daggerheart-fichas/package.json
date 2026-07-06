@@ -8,6 +8,7 @@
     "build": "vite build",
     "build:check": "rm -rf dist && vite build && node scripts/validate-pwa-build.mjs",
     "lint": "oxlint src",
+    "typecheck": "tsc --noEmit",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -22,6 +23,7 @@
     "@vitejs/plugin-react": "^6.0.2",
     "brace-expansion": "^5.0.0",
     "oxlint": "^1.69.0",
+    "typescript": "^5.8.3",
     "vite": "^8.1.0",
     "vite-plugin-pwa": "^1.3.0"
   }
