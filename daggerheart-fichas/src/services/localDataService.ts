@@ -3,19 +3,47 @@ import {
   BACKUP_FORMAT_VERSION,
   CLOUD_BACKUP_FORMAT_VERSION,
 } from "../config/appVersion";
-import { db, type CharacterRecord, type CharacterSystem, type SettingRecord } from "../db/localDb";
-import { getOrCreateDeviceId } from "./settingsService";
+import {
+  db,
+  isReadonlyCharacter,
+  type CharacterRecord,
+  type CharacterSystem,
+  type SettingRecord,
+} from "../db/localDb";
+import {
+  CLOUD_METADATA_SETTING_KEYS,
+  getOrCreateDeviceId,
+  isCloudLocalMetadataSettingKey,
+} from "./settingsService";
 import type { DaggerheartClassKey, Language } from "../sheets/daggerheart/types";
 import {
   normalizeDaggerheartCharacterData,
+  type DaggerheartCharacterData,
 } from "../sheets/daggerheart/utils/formData";
+
+export type BackupCharacterRecord = {
+  id: string;
+  name: string;
+  system: CharacterSystem;
+  class?: DaggerheartClassKey;
+  language: Language;
+  data: DaggerheartCharacterData;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+  version: number;
+};
 
 export type BackupFile = {
   app: "rpg-sheets-local-first";
   formatVersion: typeof BACKUP_FORMAT_VERSION;
   exportedAt: string;
-  characters: CharacterRecord[];
+  characters: BackupCharacterRecord[];
   settings: SettingRecord[];
+};
+
+type ParsedBackupFile = Omit<BackupFile, "characters"> & {
+  characters: CharacterRecord[];
 };
 
 export type CloudBackupPayload = {
@@ -45,8 +73,12 @@ export async function exportLocalData(): Promise<BackupFile> {
     app: "rpg-sheets-local-first",
     formatVersion: BACKUP_FORMAT_VERSION,
     exportedAt: new Date().toISOString(),
-    characters,
-    settings,
+    characters: characters
+      .filter((character) => !isReadonlyCharacter(character))
+      .map(toBackupCharacterRecord),
+    settings: settings.filter(
+      (setting) => !isCloudLocalMetadataSettingKey(setting.key)
+    ),
   };
 }
 
@@ -113,9 +145,27 @@ export async function importLocalData(
 ): Promise<ImportResult> {
   const backup = parseBackupFile(data);
 
-  await db.transaction("rw", db.characters, db.settings, async () => {
+  await db.transaction("rw", db.characters, db.syncQueue, db.settings, async () => {
+    const preservedCloudSettings =
+      options.mode === "replace"
+        ? (
+            await db.settings.bulkGet(
+              Object.values(CLOUD_METADATA_SETTING_KEYS)
+            )
+          ).filter((setting): setting is SettingRecord => Boolean(setting))
+        : [];
+
     if (options.mode === "replace") {
-      await Promise.all([db.characters.clear(), db.settings.clear()]);
+      await Promise.all([
+        db.characters.clear(),
+        db.syncQueue.clear(),
+        db.settings.clear(),
+      ]);
+    } else if (backup.characters.length > 0) {
+      await db.syncQueue
+        .where("characterId")
+        .anyOf(backup.characters.map((character) => character.id))
+        .delete();
     }
 
     if (backup.characters.length > 0) {
@@ -124,6 +174,10 @@ export async function importLocalData(
 
     if (backup.settings.length > 0) {
       await db.settings.bulkPut(backup.settings);
+    }
+
+    if (preservedCloudSettings.length > 0) {
+      await db.settings.bulkPut(preservedCloudSettings);
     }
   });
 
@@ -134,8 +188,12 @@ export async function importLocalData(
 }
 
 export async function clearLocalData() {
-  await db.transaction("rw", db.characters, db.settings, async () => {
-    await Promise.all([db.characters.clear(), db.settings.clear()]);
+  await db.transaction("rw", db.characters, db.syncQueue, db.settings, async () => {
+    await Promise.all([
+      db.characters.clear(),
+      db.syncQueue.clear(),
+      db.settings.clear(),
+    ]);
   });
 }
 
@@ -158,7 +216,24 @@ export function buildBackupFilename() {
   return `rpg-sheets-backup-${timestamp}.json`;
 }
 
-function parseBackupFile(data: unknown): BackupFile {
+function toBackupCharacterRecord(
+  character: CharacterRecord
+): BackupCharacterRecord {
+  return {
+    id: character.id,
+    name: character.name,
+    system: character.system,
+    class: character.class,
+    language: character.language,
+    data: character.data,
+    createdAt: character.createdAt,
+    updatedAt: character.updatedAt,
+    deletedAt: character.deletedAt,
+    version: character.version,
+  };
+}
+
+function parseBackupFile(data: unknown): ParsedBackupFile {
   if (!isPlainObject(data)) {
     throw new Error("INVALID_BACKUP");
   }
@@ -175,7 +250,9 @@ function parseBackupFile(data: unknown): BackupFile {
   }
 
   const characters = data.characters.map(parseCharacterRecord);
-  const settings = data.settings.map(parseSettingRecord);
+  const settings = data.settings
+    .map(parseSettingRecord)
+    .filter((setting) => !isCloudLocalMetadataSettingKey(setting.key));
   const exportedAt =
     typeof data.exportedAt === "string"
       ? data.exportedAt
@@ -209,6 +286,7 @@ function parseCharacterRecord(value: unknown): CharacterRecord {
 
   const character: CharacterRecord = {
     id: value.id,
+    permission: "owner",
     name: value.name,
     system: value.system,
     language: value.language,

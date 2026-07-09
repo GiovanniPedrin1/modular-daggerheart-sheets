@@ -3,9 +3,34 @@ import type { DaggerheartClassKey, Language } from "../sheets/daggerheart/types"
 import type { DaggerheartCharacterData } from "../sheets/daggerheart/utils/formData";
 
 export type CharacterSystem = "daggerheart" | "custom";
+export type CharacterPermission = "owner" | "viewer";
+
+export const CHARACTER_SYNC_STATUSES = [
+  "local",
+  "queued",
+  "syncing",
+  "synced",
+  "conflict",
+  "readonly",
+] as const;
+
+export type CharacterSyncStatus = (typeof CHARACTER_SYNC_STATUSES)[number];
+
+export const SYNC_QUEUE_STATUSES = [
+  "queued",
+  "syncing",
+  "failed",
+  "conflict",
+  "applied",
+] as const;
+
+export type SyncQueueStatus = (typeof SYNC_QUEUE_STATUSES)[number];
 
 export type CharacterRecord = {
   id: string;
+  remoteId?: string;
+  ownerUserId?: string;
+  permission?: CharacterPermission;
   name: string;
   system: CharacterSystem;
   class?: DaggerheartClassKey;
@@ -15,7 +40,25 @@ export type CharacterRecord = {
   updatedAt: string;
   deletedAt?: string;
   version: number;
-  syncStatus: "local";
+  serverRevision?: number;
+  baseRevision?: number;
+  lastSyncedHash?: string;
+  syncStatus: CharacterSyncStatus;
+};
+
+export type SyncQueueRecord = {
+  id: string;
+  characterId: string;
+  remoteId?: string;
+  mutationId: string;
+  deviceId: string;
+  baseRevision?: number;
+  patch: Record<string, unknown>;
+  changedPaths: string[];
+  createdAt: string;
+  status: SyncQueueStatus;
+  retryCount: number;
+  lastError?: string;
 };
 
 export type SettingRecord = {
@@ -25,6 +68,7 @@ export type SettingRecord = {
 
 class LocalRpgDb extends Dexie {
   characters!: Table<CharacterRecord, string>;
+  syncQueue!: Table<SyncQueueRecord, string>;
   settings!: Table<SettingRecord, string>;
 
   constructor() {
@@ -34,6 +78,27 @@ class LocalRpgDb extends Dexie {
       characters: "id, name, system, class, updatedAt, deletedAt",
       settings: "key",
     });
+
+    this.version(2)
+      .stores({
+        characters:
+          "id, remoteId, ownerUserId, permission, name, system, class, updatedAt, deletedAt, serverRevision, syncStatus",
+        syncQueue:
+          "id, characterId, remoteId, mutationId, deviceId, baseRevision, status, createdAt",
+        settings: "key",
+      })
+      .upgrade(async (transaction) => {
+        await transaction
+          .table<CharacterRecord, string>("characters")
+          .toCollection()
+          .modify((character) => {
+            character.permission = character.permission ?? "owner";
+            character.syncStatus = normalizeCharacterSyncStatus(
+              character.syncStatus,
+              character.permission
+            );
+          });
+      });
   }
 }
 
@@ -41,6 +106,40 @@ export const db = new LocalRpgDb();
 
 export function createId() {
   return crypto.randomUUID();
+}
+
+export function isCharacterSyncStatus(
+  value: unknown
+): value is CharacterSyncStatus {
+  return CHARACTER_SYNC_STATUSES.includes(value as CharacterSyncStatus);
+}
+
+export function normalizeCharacterSyncStatus(
+  value: unknown,
+  permission: CharacterPermission = "owner"
+): CharacterSyncStatus {
+  if (permission === "viewer") return "readonly";
+
+  return isCharacterSyncStatus(value) ? value : "local";
+}
+
+export function isSyncQueueStatus(value: unknown): value is SyncQueueStatus {
+  return SYNC_QUEUE_STATUSES.includes(value as SyncQueueStatus);
+}
+
+export function isReadonlyCharacter(
+  character: Pick<CharacterRecord, "permission" | "syncStatus">
+) {
+  return character.permission === "viewer" || character.syncStatus === "readonly";
+}
+
+export function getNextLocalEditSyncStatus(
+  character: Pick<CharacterRecord, "remoteId" | "permission" | "syncStatus">
+): CharacterSyncStatus {
+  if (isReadonlyCharacter(character)) return "readonly";
+  if (character.syncStatus === "conflict") return "conflict";
+
+  return character.remoteId ? "queued" : "local";
 }
 
 export async function listCharacters() {
@@ -70,6 +169,7 @@ export async function createCharacter(input: {
 
   const character: CharacterRecord = {
     id: createId(),
+    permission: "owner",
     name: input.name,
     system: input.system,
     class: input.class,
@@ -98,13 +198,17 @@ export async function saveCharacterData(
       throw new Error("Character not found");
     }
 
+    if (isReadonlyCharacter(current)) {
+      throw new Error("READONLY_CHARACTER");
+    }
+
     const updated: CharacterRecord = {
       ...current,
       ...patch,
       data,
       updatedAt: new Date().toISOString(),
       version: current.version + 1,
-      syncStatus: "local",
+      syncStatus: getNextLocalEditSyncStatus(current),
     };
 
     await db.characters.put(updated);
@@ -133,6 +237,10 @@ export async function softDeleteCharacter(characterId: string) {
       throw new Error("Character not found");
     }
 
+    if (isReadonlyCharacter(current)) {
+      throw new Error("READONLY_CHARACTER");
+    }
+
     const now = new Date().toISOString();
 
     const updated: CharacterRecord = {
@@ -140,7 +248,7 @@ export async function softDeleteCharacter(characterId: string) {
       deletedAt: now,
       updatedAt: now,
       version: current.version + 1,
-      syncStatus: "local",
+      syncStatus: getNextLocalEditSyncStatus(current),
     };
 
     await db.characters.put(updated);

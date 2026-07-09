@@ -18,6 +18,7 @@ import { appTexts, getSafeLanguage } from "./i18n/appTexts";
 import {
   createCharacter,
   deleteCharacter,
+  getNextLocalEditSyncStatus,
   listActiveCharacters,
   type CharacterRecord,
   type CharacterSystem,
@@ -163,7 +164,7 @@ export default function App() {
                 data: change.data,
                 updatedAt: change.updatedAt,
                 version: character.version + 1,
-                syncStatus: "local",
+                syncStatus: getNextLocalEditSyncStatus(character),
               }
             : character
         )

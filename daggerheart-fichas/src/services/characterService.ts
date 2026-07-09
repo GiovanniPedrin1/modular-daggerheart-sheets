@@ -2,14 +2,25 @@ import {
   createCharacter as createLocalCharacter,
   listCharacters as listLocalCharacters,
   saveCharacterData,
+  getNextLocalEditSyncStatus,
+  isReadonlyCharacter,
   softDeleteCharacter,
+  type CharacterPermission,
   type CharacterRecord,
+  type CharacterSyncStatus,
   type CharacterSystem,
 } from "../db/localDb";
 import type { DaggerheartClassKey, Language } from "../sheets/daggerheart/types";
 import type { DaggerheartCharacterData } from "../sheets/daggerheart/utils/formData";
 
-export type { CharacterRecord, CharacterSystem };
+export type {
+  CharacterPermission,
+  CharacterRecord,
+  CharacterSyncStatus,
+  CharacterSystem,
+};
+
+export { getNextLocalEditSyncStatus, isReadonlyCharacter };
 
 export type CreateCharacterInput = {
   name: string;

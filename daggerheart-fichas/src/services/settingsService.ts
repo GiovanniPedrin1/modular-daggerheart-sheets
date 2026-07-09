@@ -19,6 +19,19 @@ export const CLOUD_METADATA_SETTING_KEYS = {
   lastCloudRestoreAt: "lastCloudRestoreAt",
 } as const;
 
+export type CloudMetadataSettingKey =
+  (typeof CLOUD_METADATA_SETTING_KEYS)[keyof typeof CLOUD_METADATA_SETTING_KEYS];
+
+const CLOUD_METADATA_SETTING_KEY_SET = new Set<string>(
+  Object.values(CLOUD_METADATA_SETTING_KEYS)
+);
+
+export function isCloudLocalMetadataSettingKey(
+  key: string
+): key is CloudMetadataSettingKey {
+  return CLOUD_METADATA_SETTING_KEY_SET.has(key);
+}
+
 export function readSetting<T>(key: string, fallback: T): Promise<T> {
   return getLocalSetting(key, fallback);
 }
