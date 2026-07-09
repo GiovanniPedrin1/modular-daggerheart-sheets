@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.auth import router as auth_router
 from app.api.backups import router as backups_router
+from app.api.characters import router as characters_router
 from app.api.health import router as health_router
 from app.core.config import get_settings
 
@@ -46,3 +47,4 @@ async def http_exception_handler(_request: Request, exc: HTTPException) -> JSONR
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(backups_router)
+app.include_router(characters_router)

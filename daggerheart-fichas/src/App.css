@@ -917,3 +917,119 @@ textarea {
 .restore-confirm-field .delete-confirm-name {
   margin: 0;
 }
+
+.cloud-character-message {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--app-border);
+  border-radius: 14px;
+  background: var(--app-surface);
+  color: var(--app-text-soft);
+  line-height: 1.4;
+}
+
+.cloud-character-message.info {
+  border-color: var(--app-border);
+  background: var(--app-surface-muted);
+}
+
+.cloud-character-message.success {
+  border-color: var(--app-success-border);
+  background: var(--app-success-bg);
+  color: var(--app-success);
+}
+
+.cloud-character-message.error {
+  border-color: var(--app-danger-border);
+  background: var(--app-danger-bg);
+  color: var(--app-danger);
+}
+
+.character-sync-status {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: var(--app-surface-muted);
+  color: var(--app-muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.character-sync-status-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.character-sync-status-revision {
+  padding-left: 7px;
+  border-left: 1px solid currentColor;
+  font-size: 0.72rem;
+  font-weight: 700;
+  opacity: 0.72;
+}
+
+.character-sync-status.syncing {
+  border-color: var(--app-focus);
+  color: var(--app-focus);
+}
+
+.character-sync-status.syncing .character-sync-status-dot {
+  animation: character-sync-status-pulse 1.2s ease-in-out infinite;
+}
+
+.character-sync-status.synced {
+  border-color: var(--app-success-border);
+  background: var(--app-success-bg);
+  color: var(--app-success);
+}
+
+.character-sync-status.queued {
+  border-color: var(--app-warning-border);
+  background: var(--app-warning-bg);
+  color: var(--app-warning);
+}
+
+.character-sync-status.conflict {
+  border-color: var(--app-danger-border);
+  background: var(--app-danger-bg);
+  color: var(--app-danger);
+}
+
+.character-sync-status.readonly {
+  border-style: dashed;
+  color: var(--app-text-soft);
+}
+
+@keyframes character-sync-status-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .character-sync-status.syncing .character-sync-status-dot {
+    animation: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .character-sync-status {
+    width: 100%;
+    justify-content: center;
+  }
+}

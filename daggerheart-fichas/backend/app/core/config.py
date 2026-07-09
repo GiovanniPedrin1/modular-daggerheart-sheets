@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     cloud_backup_retention_limit: int = 10
     supported_cloud_backup_format_version: int = 1
     supported_local_backup_format_version: int = 1
+    max_cloud_character_payload_bytes: int = 2 * 1024 * 1024
+    supported_cloud_character_schema_version: int = 1
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -57,6 +59,22 @@ class Settings(BaseSettings):
     def require_positive_cloud_backup_size(cls, value: int) -> int:
         if value <= 0:
             raise ValueError("MAX_CLOUD_BACKUP_PAYLOAD_BYTES must be greater than zero")
+        return value
+
+    @field_validator("max_cloud_character_payload_bytes")
+    @classmethod
+    def require_positive_cloud_character_size(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("MAX_CLOUD_CHARACTER_PAYLOAD_BYTES must be greater than zero")
+        return value
+
+    @field_validator("supported_cloud_character_schema_version")
+    @classmethod
+    def require_positive_cloud_character_schema_version(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError(
+                "SUPPORTED_CLOUD_CHARACTER_SCHEMA_VERSION must be greater than zero"
+            )
         return value
 
     @field_validator("cloud_backup_retention_limit")

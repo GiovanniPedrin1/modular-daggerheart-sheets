@@ -117,3 +117,16 @@ VITE_API_BASE_URL=http://localhost:8000
 ```
 
 O frontend usa `credentials: include`, então mantenha `CORS_ALLOWED_ORIGINS` com a origem do Vite, por exemplo `http://localhost:5173`.
+
+## Cloud character service
+
+`app/services/cloud_character_service.py` owns the Phase 1 domain rules for live cloud-character snapshots:
+
+- active owner-scoped lookup and listing;
+- idempotent publication by `owner_user_id + local_character_id + content_hash`;
+- optimistic revision checks for snapshot replacement;
+- no revision increment for unchanged content;
+- soft delete through `deleted_at`;
+- payload-size and supported-schema validation.
+
+The service calls `flush()` but leaves the normal transaction `commit()` to the HTTP endpoint. The only internal rollback occurs when recovering from a concurrent unique-index race during publication.

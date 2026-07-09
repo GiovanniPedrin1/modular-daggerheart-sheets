@@ -2,17 +2,16 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Annotated, Any
+from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, status
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import clear_refresh_cookie, get_active_refresh_session
+from app.api.dependencies import CurrentUser, DbSession, SettingsDep
 from app.api.errors import api_error
-from app.core.config import Settings, get_settings
-from app.db.session import get_db_session
+from app.core.config import Settings
 from app.models.cloud_backup import CloudBackup
 from app.models.user import User
 from app.schemas.backups import (
@@ -26,35 +25,6 @@ from app.schemas.backups import (
 )
 
 router = APIRouter(prefix="/backups", tags=["backups"])
-
-DbSession = Annotated[AsyncSession, Depends(get_db_session)]
-SettingsDep = Annotated[Settings, Depends(get_settings)]
-
-
-async def require_current_user(
-    request: Request,
-    response: Response,
-    session: DbSession,
-    settings: SettingsDep,
-) -> User:
-    active_session = await get_active_refresh_session(
-        session,
-        settings=settings,
-        token=request.cookies.get(settings.session_cookie_name),
-    )
-
-    if active_session is None:
-        clear_refresh_cookie(response, settings=settings)
-        raise api_error(
-            status.HTTP_401_UNAUTHORIZED,
-            "SESSION_EXPIRED",
-            "Your session has expired. Please sign in again.",
-        )
-
-    return active_session.user
-
-
-CurrentUser = Annotated[User, Depends(require_current_user)]
 
 
 def stable_json_dumps(value: Any) -> str:

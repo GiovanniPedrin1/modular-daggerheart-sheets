@@ -3,6 +3,7 @@ import type { CharacterRecord } from "../../services/characterService";
 import type { UserAccount } from "../../services/authService";
 import type { Language } from "../../sheets/daggerheart/types";
 import type { AppText, AuthMode } from "./appTypes";
+import { CharacterSyncStatusBadge } from "./CharacterSyncStatusBadge";
 
 type AppTopbarProps = {
   t: AppText;
@@ -16,6 +17,10 @@ type AppTopbarProps = {
   onSelectCharacter: (characterId: string) => void;
   onOpenCreateModal: () => void;
   onOpenDeleteModal: () => void;
+  canAttemptCharacterSync: boolean;
+  isCharacterSyncActivating: boolean;
+  characterSyncButtonTitle: string;
+  onActivateCharacterSync: () => void;
   onOpenSettings: () => void;
   onOpenLogin: (mode?: AuthMode) => void;
   onLanguageChange: Dispatch<SetStateAction<Language>>;
@@ -34,6 +39,10 @@ export function AppTopbar({
   onSelectCharacter,
   onOpenCreateModal,
   onOpenDeleteModal,
+  canAttemptCharacterSync,
+  isCharacterSyncActivating,
+  characterSyncButtonTitle,
+  onActivateCharacterSync,
   onOpenSettings,
   onOpenLogin,
   onLanguageChange,
@@ -68,7 +77,32 @@ export function AppTopbar({
         </select>
 
         {selectedCharacter && (
-          <button className="button secondary" type="button" onClick={onOpenDeleteModal}>
+          <CharacterSyncStatusBadge t={t} character={selectedCharacter} />
+        )}
+
+        {selectedCharacter &&
+          selectedCharacter.permission !== "viewer" &&
+          !selectedCharacter.remoteId && (
+            <button
+              className="button secondary"
+              type="button"
+              onClick={onActivateCharacterSync}
+              disabled={!canAttemptCharacterSync}
+              title={characterSyncButtonTitle}
+            >
+              {isCharacterSyncActivating
+                ? t.cloudSyncActivating
+                : t.cloudSyncActivate}
+            </button>
+          )}
+
+        {selectedCharacter && (
+          <button
+            className="button secondary"
+            type="button"
+            onClick={onOpenDeleteModal}
+            disabled={isCharacterSyncActivating}
+          >
             {t.deleteCharacter}
           </button>
         )}

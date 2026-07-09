@@ -33,6 +33,10 @@ import {
 } from "./services/localDataService";
 import { ApiClientError, isCloudApiConfigured } from "./services/apiClient";
 import {
+  activateCharacterSync,
+  ActivateCharacterSyncError,
+} from "./services/cloudCharacterSyncService";
+import {
   getCharacterRoutePath,
   getDecodedRouteParam,
   getInitialRouteCharacterId,
@@ -89,6 +93,9 @@ export default function App() {
   const [isRestoreReplaceModalOpen, setIsRestoreReplaceModalOpen] = useState(false);
   const [isCloudSessionLoading, setIsCloudSessionLoading] = useState(false);
   const [isCloudActionPending, setIsCloudActionPending] = useState(false);
+  const [activatingSyncCharacterId, setActivatingSyncCharacterId] = useState("");
+  const [cloudCharacterMessage, setCloudCharacterMessage] =
+    useState<SettingsMessage>(null);
   const [characters, setCharacters] = useState<CharacterRecord[]>([]);
   const [selectedCharacterId, setSelectedCharacterId] = useState("");
 
@@ -211,6 +218,28 @@ export default function App() {
   const canConfirmRestoreReplace =
     restoreReplaceConfirmation.trim() === t.cloudRestoreReplaceToken;
   const shouldShowSettingsModal = isSettingsModalOpen || isSettingsRoute;
+  const isSelectedCharacterSyncActivating =
+    Boolean(selectedCharacter) &&
+    activatingSyncCharacterId === selectedCharacter?.id;
+  const canAttemptSelectedCharacterSync =
+    Boolean(selectedCharacter) &&
+    !selectedCharacter?.remoteId &&
+    selectedCharacter?.permission !== "viewer" &&
+    selectedCharacter?.syncStatus !== "readonly" &&
+    canUseCloud &&
+    !isCloudSessionLoading &&
+    !isCloudActionPending &&
+    !isSelectedCharacterSyncActivating;
+
+  const selectedCharacterSyncButtonTitle = selectedCharacter?.remoteId
+    ? t.cloudSyncActiveHelp
+    : !cloudApiConfigured
+      ? t.cloudSyncUnavailableHelp
+      : !isOnline
+        ? t.cloudSyncOfflineHelp
+        : !currentUser
+          ? t.cloudSyncLoginRequiredHelp
+          : t.cloudSyncActivateHelp;
 
   useEffect(() => {
     let cancelled = false;
@@ -489,6 +518,7 @@ export default function App() {
     options?: { replace?: boolean }
   ) {
     setSelectedCharacterId(characterId);
+    setCloudCharacterMessage(null);
     resetSaveStatus();
     navigate(characterId ? getCharacterRoutePath(characterId) : "/", options);
   }
@@ -868,6 +898,72 @@ export default function App() {
     }
   }
 
+  async function handleActivateSelectedCharacterSync() {
+    if (!selectedCharacter || selectedCharacter.remoteId) return;
+
+    if (!currentUser) {
+      openLoginModal("login");
+      return;
+    }
+
+    if (!canAttemptSelectedCharacterSync) return;
+
+    setActivatingSyncCharacterId(selectedCharacter.id);
+    setCloudCharacterMessage({ kind: "info", text: t.cloudSyncPreparing });
+
+    try {
+      const localSaveSucceeded = await flushPendingAutosaves();
+
+      if (!localSaveSucceeded) {
+        setCloudCharacterMessage({
+          kind: "error",
+          text: t.cloudSyncLocalSaveError,
+        });
+        return;
+      }
+
+      setCharacters((current) =>
+        current.map((character) =>
+          character.id === selectedCharacter.id
+            ? { ...character, syncStatus: "syncing" }
+            : character
+        )
+      );
+
+      const result = await activateCharacterSync({
+        characterId: selectedCharacter.id,
+        ownerUserId: currentUser.id,
+      });
+
+      setCharacters((current) =>
+        current.map((character) =>
+          character.id === result.character.id ? result.character : character
+        )
+      );
+
+      setCloudCharacterMessage({
+        kind: "success",
+        text: result.localChangesQueued
+          ? t.cloudSyncActivatedWithQueuedChanges
+          : result.response.created
+            ? t.cloudSyncActivated
+            : t.cloudSyncAlreadyActivated,
+      });
+    } catch (error) {
+      console.error(error);
+
+      const fallback =
+        error instanceof ActivateCharacterSyncError
+          ? t.cloudSyncActivateError
+          : getErrorText(error, t.cloudSyncActivateError);
+
+      setCloudCharacterMessage({ kind: "error", text: fallback });
+      await refreshCharacters();
+    } finally {
+      setActivatingSyncCharacterId("");
+    }
+  }
+
   function getCharacterClassLabel(character: CharacterRecord) {
     if (!character.class) return "";
 
@@ -917,6 +1013,10 @@ export default function App() {
             setDeleteConfirmationName("");
             setIsDeleteModalOpen(true);
           }}
+          canAttemptCharacterSync={canAttemptSelectedCharacterSync}
+          isCharacterSyncActivating={isSelectedCharacterSyncActivating}
+          characterSyncButtonTitle={selectedCharacterSyncButtonTitle}
+          onActivateCharacterSync={handleActivateSelectedCharacterSync}
           onOpenSettings={() => {
             setSettingsMessage(null);
             setIsSettingsModalOpen(true);
@@ -932,6 +1032,16 @@ export default function App() {
             <div className="offline-banner" role="status" aria-live="polite">
               <strong>{t.offlineBannerTitle}</strong>
               <span>{t.offlineBannerDescription}</span>
+            </div>
+          )}
+
+          {cloudCharacterMessage && (
+            <div
+              className={`cloud-character-message ${cloudCharacterMessage.kind}`}
+              role={cloudCharacterMessage.kind === "error" ? "alert" : "status"}
+              aria-live="polite"
+            >
+              {cloudCharacterMessage.text}
             </div>
           )}
 

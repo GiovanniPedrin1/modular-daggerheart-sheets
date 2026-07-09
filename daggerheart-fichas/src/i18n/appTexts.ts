@@ -33,6 +33,47 @@ export const appTexts = {
     saving: "Salvando...",
     savedLocally: "Salvo localmente",
     saveError: "Erro ao salvar localmente",
+    cloudSyncActivate: "Ativar sync",
+    cloudSyncActivating: "Ativando sync...",
+    cloudSyncActive: "Sync ativo",
+    cloudSyncStatusLabel: "Status da sincronização",
+    cloudSyncStatusLocal: "Somente local",
+    cloudSyncStatusLocalHelp:
+      "Esta ficha está salva apenas neste dispositivo.",
+    cloudSyncStatusSyncing: "Enviando...",
+    cloudSyncStatusSyncingHelp:
+      "A ficha está sendo publicada e vinculada à nuvem.",
+    cloudSyncStatusSynced: "Sincronizada",
+    cloudSyncStatusSyncedHelp:
+      "O snapshot local corresponde à última revisão salva na nuvem.",
+    cloudSyncStatusQueued: "Alterações pendentes",
+    cloudSyncStatusQueuedHelp:
+      "Há alterações locais posteriores ao último snapshot salvo na nuvem.",
+    cloudSyncStatusConflict: "Conflito",
+    cloudSyncStatusConflictHelp:
+      "A ficha precisa de revisão antes de novas alterações serem enviadas.",
+    cloudSyncStatusReadonly: "Somente leitura",
+    cloudSyncStatusReadonlyHelp:
+      "Esta ficha pode ser visualizada, mas não editada neste dispositivo.",
+    cloudSyncStatusRevision: (revision: number) => `rev. ${revision}`,
+    cloudSyncActivateHelp:
+      "Publica esta ficha na sua conta e vincula este dispositivo à versão na nuvem.",
+    cloudSyncActiveHelp:
+      "Esta ficha já está vinculada a uma versão viva na nuvem.",
+    cloudSyncOfflineHelp: "Conecte-se à internet para ativar o sync desta ficha.",
+    cloudSyncLoginRequiredHelp:
+      "Entre na sua conta para ativar o sync desta ficha.",
+    cloudSyncUnavailableHelp:
+      "A API de nuvem não está configurada neste ambiente.",
+    cloudSyncPreparing: "Salvando alterações locais e publicando a ficha...",
+    cloudSyncLocalSaveError:
+      "Não foi possível concluir o salvamento local antes de ativar o sync.",
+    cloudSyncActivated: "Sync ativado. A ficha foi publicada na nuvem.",
+    cloudSyncAlreadyActivated:
+      "O vínculo cloud já existia e foi restaurado neste dispositivo.",
+    cloudSyncActivatedWithQueuedChanges:
+      "Sync ativado. Alterações feitas durante o envio ficaram pendentes para a próxima sincronização.",
+    cloudSyncActivateError: "Não foi possível ativar o sync desta ficha.",
     deleteCharacter: "Apagar personagem",
     delete: "Apagar",
     deletePrompt: "Para apagar este personagem, digite exatamente:",
@@ -239,6 +280,47 @@ export const appTexts = {
     saving: "Saving...",
     savedLocally: "Saved locally",
     saveError: "Local save error",
+    cloudSyncActivate: "Enable sync",
+    cloudSyncActivating: "Enabling sync...",
+    cloudSyncActive: "Sync active",
+    cloudSyncStatusLabel: "Sync status",
+    cloudSyncStatusLocal: "Local only",
+    cloudSyncStatusLocalHelp:
+      "This character is saved only on this device.",
+    cloudSyncStatusSyncing: "Uploading...",
+    cloudSyncStatusSyncingHelp:
+      "The character is being published and linked to the cloud.",
+    cloudSyncStatusSynced: "Synced",
+    cloudSyncStatusSyncedHelp:
+      "The local snapshot matches the latest revision saved in the cloud.",
+    cloudSyncStatusQueued: "Changes pending",
+    cloudSyncStatusQueuedHelp:
+      "There are local changes newer than the last snapshot saved in the cloud.",
+    cloudSyncStatusConflict: "Conflict",
+    cloudSyncStatusConflictHelp:
+      "The character needs review before more changes can be uploaded.",
+    cloudSyncStatusReadonly: "Read only",
+    cloudSyncStatusReadonlyHelp:
+      "This character can be viewed but not edited on this device.",
+    cloudSyncStatusRevision: (revision: number) => `rev. ${revision}`,
+    cloudSyncActivateHelp:
+      "Publishes this character to your account and links this device to the cloud version.",
+    cloudSyncActiveHelp:
+      "This character is already linked to a live cloud version.",
+    cloudSyncOfflineHelp: "Connect to the internet to enable sync for this character.",
+    cloudSyncLoginRequiredHelp:
+      "Sign in to your account to enable sync for this character.",
+    cloudSyncUnavailableHelp:
+      "The cloud API is not configured in this environment.",
+    cloudSyncPreparing: "Saving local changes and publishing the character...",
+    cloudSyncLocalSaveError:
+      "Could not finish the local save before enabling sync.",
+    cloudSyncActivated: "Sync enabled. The character was published to the cloud.",
+    cloudSyncAlreadyActivated:
+      "The cloud link already existed and was restored on this device.",
+    cloudSyncActivatedWithQueuedChanges:
+      "Sync enabled. Changes made during upload are queued for the next synchronization.",
+    cloudSyncActivateError: "Could not enable sync for this character.",
     deleteCharacter: "Delete character",
     delete: "Delete",
     deletePrompt: "To delete this character, type exactly:",
