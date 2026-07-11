@@ -77,6 +77,52 @@
   color: var(--dh-save-error-text, #b91c1c);
 }
 
+.dh-readonly-banner {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: baseline;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--dh-line);
+  background: var(--dh-surface-muted);
+  color: var(--dh-brand-2);
+  font-size: 0.84rem;
+}
+
+.dh-readonly-banner strong {
+  color: var(--dh-brand);
+  font-weight: 900;
+}
+
+.dh-readonly-scope {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.dh-sheet.is-readonly .dh-readonly-scope :is(input, textarea, select):disabled {
+  opacity: 1;
+  color: var(--dh-ink);
+  -webkit-text-fill-color: var(--dh-ink);
+  cursor: default;
+}
+
+.dh-sheet.is-readonly .dh-readonly-scope input[type="checkbox"]:disabled {
+  opacity: 1;
+}
+
+.dh-sheet.is-readonly .dh-readonly-scope textarea:disabled {
+  resize: none;
+}
+
+.dh-sheet.is-readonly .dh-readonly-scope button:disabled {
+  cursor: not-allowed;
+}
+
 .dh-sheet label,
 .dh-label {
   display: block;
@@ -1085,7 +1131,8 @@ textarea.dh-companion-image-box {
     border-radius: 0;
   }
 
-  .dh-save-status {
+  .dh-save-status,
+  .dh-readonly-banner {
     display: none;
   }
 

@@ -6,6 +6,9 @@ export const daggerheartTexts: Record<"pt-BR" | "en-US", DaggerheartTexts> = {
       "Esta ficha não possui uma classe Daggerheart válida. Crie um personagem com classe ou ajuste o registro salvo.",
     customSheetTitle: "Ficha customizada",
     unsupportedSystemMessage: "Sistema ainda não possui ficha configurada.",
+    readOnlyMode: "Modo leitura",
+    readOnlyDescription:
+      "Esta ficha foi compartilhada com você. É possível navegar e consultar os dados, mas não alterá-los.",
 
     name: "Nome",
     pronouns: "Pronomes",
@@ -214,6 +217,9 @@ export const daggerheartTexts: Record<"pt-BR" | "en-US", DaggerheartTexts> = {
       "This sheet does not have a valid Daggerheart class. Create a character with a class or fix the saved record.",
     customSheetTitle: "Custom sheet",
     unsupportedSystemMessage: "This system does not have a configured sheet yet.",
+    readOnlyMode: "Read-only mode",
+    readOnlyDescription:
+      "This sheet was shared with you. You can navigate and view its data, but you cannot change it.",
 
     name: "Name",
     pronouns: "Pronouns",

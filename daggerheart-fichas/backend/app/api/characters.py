@@ -7,6 +7,7 @@ from fastapi import APIRouter, Response, status
 
 from app.api.dependencies import CurrentUser, DbSession, SettingsDep
 from app.api.errors import api_error
+from app.models.character_share import CharacterShare
 from app.models.cloud_character import CloudCharacter
 from app.schemas.characters import (
     CharacterTooLargeDetail,
@@ -23,7 +24,19 @@ from app.schemas.characters import (
     UpdateCloudCharacterRequest,
     UpdateCloudCharacterResponse,
 )
+from app.schemas.shares import (
+    CannotShareWithSelfDetail,
+    CharacterShareNotFoundDetail,
+    CharacterSharePublic,
+    CreateCharacterShareRequest,
+    CreateCharacterShareResponse,
+    InvalidShareTargetDetail,
+    ListCharacterSharesResponse,
+    RevokeCharacterShareResponse,
+)
+from app.services import character_share_service as share_service
 from app.services import cloud_character_service as character_service
+from app.services import share_target_service
 
 router = APIRouter(prefix="/characters/cloud", tags=["cloud-characters"])
 
@@ -34,6 +47,10 @@ def to_public_character(character: CloudCharacter) -> CloudCharacterPublic:
 
 def to_list_item(character: CloudCharacter) -> CloudCharacterListItem:
     return CloudCharacterListItem.model_validate(character)
+
+
+def to_public_share(share: CharacterShare) -> CharacterSharePublic:
+    return CharacterSharePublic.from_share(share)
 
 
 def raise_cloud_character_api_error(
@@ -106,6 +123,43 @@ def raise_cloud_character_api_error(
     raise error
 
 
+def raise_character_share_api_error(error: Exception) -> NoReturn:
+    if isinstance(error, character_service.CloudCharacterServiceError):
+        raise_cloud_character_api_error(error)
+
+    if isinstance(error, share_service.CannotShareWithSelfError):
+        detail = CannotShareWithSelfDetail(character_id=error.character_id)
+        raise api_error(
+            status.HTTP_409_CONFLICT,
+            "CANNOT_SHARE_WITH_SELF",
+            "A cloud character cannot be shared with its owner.",
+            detail.model_dump(by_alias=True, mode="json"),
+        ) from error
+
+    if isinstance(error, share_service.CharacterShareNotFoundError):
+        detail = CharacterShareNotFoundDetail(
+            character_id=error.character_id,
+            share_id=error.share_id,
+        )
+        raise api_error(
+            status.HTTP_404_NOT_FOUND,
+            "CHARACTER_SHARE_NOT_FOUND",
+            "Character share was not found.",
+            detail.model_dump(by_alias=True, mode="json"),
+        ) from error
+
+    if isinstance(error, share_target_service.InvalidShareTargetError):
+        detail = InvalidShareTargetDetail(target_type=error.target_kind)
+        raise api_error(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "INVALID_SHARE_TARGET",
+            "The share target could not identify a recipient.",
+            detail.model_dump(by_alias=True, mode="json"),
+        ) from error
+
+    raise error
+
+
 @router.post(
     "",
     response_model=CreateCloudCharacterResponse,
@@ -167,6 +221,127 @@ async def list_cloud_characters(
     )
     return ListCloudCharactersResponse(
         characters=[to_list_item(character) for character in characters]
+    )
+
+
+@router.post(
+    "/{character_id}/shares",
+    response_model=CreateCharacterShareResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        status.HTTP_200_OK: {
+            "description": "The current target is already shared; the retry is idempotent."
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "description": "The character is missing, deleted, or owned by another user."
+        },
+        status.HTTP_409_CONFLICT: {
+            "description": "The resolved share target is the character owner."
+        },
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {
+            "description": "The request is invalid or the public code cannot identify a user."
+        },
+    },
+)
+async def create_character_share(
+    character_id: UUID,
+    input_data: CreateCharacterShareRequest,
+    response: Response,
+    session: DbSession,
+    current_user: CurrentUser,
+) -> CreateCharacterShareResponse:
+    try:
+        result = await share_service.create_character_share(
+            session,
+            owner=current_user,
+            character_id=character_id,
+            input_data=input_data,
+        )
+    except (
+        share_service.CharacterShareServiceError,
+        character_service.CloudCharacterServiceError,
+        share_target_service.InvalidShareTargetError,
+    ) as error:
+        raise_character_share_api_error(error)
+
+    if result.created:
+        await session.commit()
+        await session.refresh(result.share)
+        response.status_code = status.HTTP_201_CREATED
+    else:
+        response.status_code = status.HTTP_200_OK
+
+    return CreateCharacterShareResponse(
+        share=to_public_share(result.share),
+        created=result.created,
+        reason=result.reason,
+    )
+
+
+@router.get(
+    "/{character_id}/shares",
+    response_model=ListCharacterSharesResponse,
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "description": "The character is missing, deleted, or owned by another user."
+        }
+    },
+)
+async def list_character_shares(
+    character_id: UUID,
+    session: DbSession,
+    current_user: CurrentUser,
+) -> ListCharacterSharesResponse:
+    try:
+        shares = await share_service.list_character_shares(
+            session,
+            owner_user_id=current_user.id,
+            character_id=character_id,
+        )
+    except character_service.CloudCharacterServiceError as error:
+        raise_character_share_api_error(error)
+
+    return ListCharacterSharesResponse(
+        shares=[to_public_share(share) for share in shares]
+    )
+
+
+@router.delete(
+    "/{character_id}/shares/{share_id}",
+    response_model=RevokeCharacterShareResponse,
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "description": (
+                "The character or current share is missing, belongs to another owner, "
+                "or the share was already revoked."
+            )
+        }
+    },
+)
+async def revoke_character_share(
+    character_id: UUID,
+    share_id: UUID,
+    session: DbSession,
+    current_user: CurrentUser,
+) -> RevokeCharacterShareResponse:
+    try:
+        result = await share_service.revoke_character_share(
+            session,
+            owner_user_id=current_user.id,
+            character_id=character_id,
+            share_id=share_id,
+        )
+    except (
+        share_service.CharacterShareServiceError,
+        character_service.CloudCharacterServiceError,
+    ) as error:
+        raise_character_share_api_error(error)
+
+    await session.commit()
+    return RevokeCharacterShareResponse(
+        share_id=result.share_id,
+        character_id=result.character_id,
+        revoked_at=result.revoked_at,
     )
 
 

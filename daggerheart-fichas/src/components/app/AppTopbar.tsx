@@ -1,5 +1,8 @@
 import type { Dispatch, SetStateAction } from "react";
-import type { CharacterRecord } from "../../services/characterService";
+import {
+  isReadonlyCharacter,
+  type CharacterRecord,
+} from "../../services/characterService";
 import type { UserAccount } from "../../services/authService";
 import type { Language } from "../../sheets/daggerheart/types";
 import type { AppText, AuthMode } from "./appTypes";
@@ -14,6 +17,9 @@ type AppTopbarProps = {
   language: Language;
   currentUser: UserAccount | null;
   accountButtonLabel: string;
+  isSharedCharactersView: boolean;
+  onOpenOwnedCharacters: () => void;
+  onOpenSharedCharacters: () => void;
   onSelectCharacter: (characterId: string) => void;
   onOpenCreateModal: () => void;
   onOpenDeleteModal: () => void;
@@ -21,6 +27,9 @@ type AppTopbarProps = {
   isCharacterSyncActivating: boolean;
   characterSyncButtonTitle: string;
   onActivateCharacterSync: () => void;
+  canAttemptCharacterShare: boolean;
+  characterShareButtonTitle: string;
+  onOpenCharacterShare: () => void;
   onOpenSettings: () => void;
   onOpenLogin: (mode?: AuthMode) => void;
   onLanguageChange: Dispatch<SetStateAction<Language>>;
@@ -36,6 +45,9 @@ export function AppTopbar({
   language,
   currentUser,
   accountButtonLabel,
+  isSharedCharactersView,
+  onOpenOwnedCharacters,
+  onOpenSharedCharacters,
   onSelectCharacter,
   onOpenCreateModal,
   onOpenDeleteModal,
@@ -43,6 +55,9 @@ export function AppTopbar({
   isCharacterSyncActivating,
   characterSyncButtonTitle,
   onActivateCharacterSync,
+  canAttemptCharacterShare,
+  characterShareButtonTitle,
+  onOpenCharacterShare,
   onOpenSettings,
   onOpenLogin,
   onLanguageChange,
@@ -51,60 +66,101 @@ export function AppTopbar({
   return (
     <header className="topbar">
       <div className="topbar-left">
-        <button className="button" type="button" onClick={onOpenCreateModal}>
-          {t.createCharacter}
-        </button>
-
-        <select
-          className="select character-select"
-          value={selectedCharacterId}
-          onChange={(event) => {
-            onSelectCharacter(event.target.value);
-          }}
-        >
-          <option value="">{t.selectCharacter}</option>
-
-          {characters.map((character) => {
-            const classLabel = getCharacterClassLabel(character);
-
-            return (
-              <option key={character.id} value={character.id}>
-                {character.name}
-                {classLabel ? ` — ${classLabel}` : ""}
-              </option>
-            );
-          })}
-        </select>
-
-        {selectedCharacter && (
-          <CharacterSyncStatusBadge t={t} character={selectedCharacter} />
-        )}
-
-        {selectedCharacter &&
-          selectedCharacter.permission !== "viewer" &&
-          !selectedCharacter.remoteId && (
-            <button
-              className="button secondary"
-              type="button"
-              onClick={onActivateCharacterSync}
-              disabled={!canAttemptCharacterSync}
-              title={characterSyncButtonTitle}
-            >
-              {isCharacterSyncActivating
-                ? t.cloudSyncActivating
-                : t.cloudSyncActivate}
-            </button>
-          )}
-
-        {selectedCharacter && (
+        <div className="character-view-switcher" role="group" aria-label={t.sharedCharactersNavigation}>
           <button
-            className="button secondary"
+            className={`button secondary view-switch-button ${
+              isSharedCharactersView ? "" : "active"
+            }`}
             type="button"
-            onClick={onOpenDeleteModal}
-            disabled={isCharacterSyncActivating}
+            onClick={onOpenOwnedCharacters}
+            aria-pressed={!isSharedCharactersView}
           >
-            {t.deleteCharacter}
+            {t.myCharacters}
           </button>
+          <button
+            className={`button secondary view-switch-button ${
+              isSharedCharactersView ? "active" : ""
+            }`}
+            type="button"
+            onClick={onOpenSharedCharacters}
+            aria-pressed={isSharedCharactersView}
+          >
+            {t.sharedCharactersNavigation}
+          </button>
+        </div>
+
+        {!isSharedCharactersView && (
+          <>
+            <button className="button" type="button" onClick={onOpenCreateModal}>
+              {t.createCharacter}
+            </button>
+
+            <select
+              className="select character-select"
+              value={selectedCharacterId}
+              onChange={(event) => {
+                onSelectCharacter(event.target.value);
+              }}
+            >
+              <option value="">{t.selectCharacter}</option>
+
+              {characters.map((character) => {
+                const classLabel = getCharacterClassLabel(character);
+
+                return (
+                  <option key={character.id} value={character.id}>
+                    {character.name}
+                    {classLabel ? ` — ${classLabel}` : ""}
+                  </option>
+                );
+              })}
+            </select>
+
+            {selectedCharacter && (
+              <CharacterSyncStatusBadge t={t} character={selectedCharacter} />
+            )}
+
+            {selectedCharacter &&
+              !isReadonlyCharacter(selectedCharacter) &&
+              !selectedCharacter.remoteId && (
+                <button
+                  className="button secondary"
+                  type="button"
+                  onClick={onActivateCharacterSync}
+                  disabled={!canAttemptCharacterSync}
+                  title={characterSyncButtonTitle}
+                >
+                  {isCharacterSyncActivating
+                    ? t.cloudSyncActivating
+                    : t.cloudSyncActivate}
+                </button>
+              )}
+
+            {selectedCharacter &&
+              !isReadonlyCharacter(selectedCharacter) &&
+              selectedCharacter.remoteId && (
+                <button
+                  className="button secondary"
+                  type="button"
+                  onClick={onOpenCharacterShare}
+                  disabled={!canAttemptCharacterShare}
+                  title={characterShareButtonTitle}
+                >
+                  {t.characterShareButton}
+                </button>
+              )}
+
+            {selectedCharacter && !isReadonlyCharacter(selectedCharacter) && (
+              <button
+                className="button secondary"
+                type="button"
+                onClick={onOpenDeleteModal}
+                disabled={isCharacterSyncActivating}
+              >
+                {t.deleteCharacter}
+              </button>
+            )}
+          </>
         )}
       </div>
 

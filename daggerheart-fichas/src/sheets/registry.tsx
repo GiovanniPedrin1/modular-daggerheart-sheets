@@ -16,6 +16,7 @@ type Character = {
 type SheetRendererProps = {
   character: Character;
   language: Language;
+  readOnly?: boolean;
   saveStatusLabel?: string;
   saveStatusKind?: "editing" | "saving" | "saved" | "error";
   onSheetDataChange?: (data: DaggerheartCharacterData) => void;
@@ -31,6 +32,7 @@ function isDaggerheartClassKey(value?: string): value is DaggerheartClassKey {
 export function SheetRenderer({
   character,
   language,
+  readOnly = false,
   saveStatusLabel,
   saveStatusKind,
   onSheetDataChange,
@@ -56,11 +58,12 @@ export function SheetRenderer({
         language={language}
         definition={daggerheartClasses[character.class]}
         initialData={character.data}
-        saveStatusLabel={saveStatusLabel}
-        saveStatusKind={saveStatusKind}
-        onSheetDataChange={onSheetDataChange}
-        onSheetEditingStart={onSheetEditingStart}
-        onSheetEditingEnd={onSheetEditingEnd}
+        readOnly={readOnly}
+        saveStatusLabel={readOnly ? undefined : saveStatusLabel}
+        saveStatusKind={readOnly ? undefined : saveStatusKind}
+        onSheetDataChange={readOnly ? undefined : onSheetDataChange}
+        onSheetEditingStart={readOnly ? undefined : onSheetEditingStart}
+        onSheetEditingEnd={readOnly ? undefined : onSheetEditingEnd}
         classDecorationsEnabled={classDecorationsEnabled}
       />
     );

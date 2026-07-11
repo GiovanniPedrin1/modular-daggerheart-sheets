@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  isReadonlyCharacter,
   saveCharacterSheetData,
   type CharacterRecord,
 } from "../services/characterService";
@@ -26,6 +27,7 @@ type PendingAutosave = {
 
 type UseCharacterAutosaveOptions = {
   selectedCharacter?: CharacterRecord;
+  readOnly?: boolean;
   onOptimisticCharacterChange: (
     characterId: string,
     change: OptimisticCharacterChange
@@ -38,6 +40,7 @@ const EDITING_RELEASE_DELAY_MS = 150;
 
 export function useCharacterAutosave({
   selectedCharacter,
+  readOnly = false,
   onOptimisticCharacterChange,
   onSavedCharacter,
 }: UseCharacterAutosaveOptions) {
@@ -46,6 +49,9 @@ export function useCharacterAutosave({
   const mountedRef = useRef(true);
   const selectedCharacterRef = useRef<CharacterRecord | undefined>(selectedCharacter);
   const selectedCharacterIdRef = useRef(selectedCharacter?.id ?? "");
+  const autosaveDisabledRef = useRef(
+    readOnly || Boolean(selectedCharacter && isReadonlyCharacter(selectedCharacter))
+  );
   const autosaveTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const activeEditingCharactersRef = useRef(new Set<string>());
   const editingReleaseTimersRef = useRef(
@@ -65,6 +71,18 @@ export function useCharacterAutosave({
     selectedCharacterRef.current = selectedCharacter;
     selectedCharacterIdRef.current = selectedCharacter?.id ?? "";
   }, [selectedCharacter]);
+
+  useEffect(() => {
+    const disabled =
+      readOnly || Boolean(selectedCharacter && isReadonlyCharacter(selectedCharacter));
+
+    autosaveDisabledRef.current = disabled;
+
+    if (disabled && selectedCharacter?.id) {
+      cancelPendingAutosaves(selectedCharacter.id);
+      setSaveStatus("idle");
+    }
+  }, [readOnly, selectedCharacter]);
 
   useEffect(() => {
     setSaveStatus("idle");
@@ -120,6 +138,14 @@ export function useCharacterAutosave({
   }, []);
 
   async function performAutosave(pending: PendingAutosave): Promise<boolean> {
+    if (
+      autosaveDisabledRef.current &&
+      selectedCharacterIdRef.current === pending.characterId
+    ) {
+      pendingAutosavesRef.current.delete(pending.characterId);
+      return true;
+    }
+
     const latestRequestId = latestAutosaveRequestRef.current.get(
       pending.characterId
     );
@@ -245,6 +271,8 @@ export function useCharacterAutosave({
   }
 
   function markSelectedCharacterEditing() {
+    if (autosaveDisabledRef.current) return;
+
     const characterId = selectedCharacterRef.current?.id;
 
     if (characterId) {
@@ -253,6 +281,8 @@ export function useCharacterAutosave({
   }
 
   function releaseSelectedCharacterEditing() {
+    if (autosaveDisabledRef.current) return;
+
     const characterId = selectedCharacterRef.current?.id;
 
     if (characterId) {
@@ -317,7 +347,13 @@ export function useCharacterAutosave({
   function handleSheetDataChange(data: DaggerheartCharacterData) {
     const currentCharacter = selectedCharacterRef.current;
 
-    if (!currentCharacter) return;
+    if (
+      !currentCharacter ||
+      autosaveDisabledRef.current ||
+      isReadonlyCharacter(currentCharacter)
+    ) {
+      return;
+    }
 
     const characterId = currentCharacter.id;
     const nextName =

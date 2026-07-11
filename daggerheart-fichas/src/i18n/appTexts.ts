@@ -74,6 +74,89 @@ export const appTexts = {
     cloudSyncActivatedWithQueuedChanges:
       "Sync ativado. Alterações feitas durante o envio ficaram pendentes para a próxima sincronização.",
     cloudSyncActivateError: "Não foi possível ativar o sync desta ficha.",
+    characterShareButton: "Compartilhar",
+    characterShareButtonHelp:
+      "Gerencie quem pode visualizar a versão desta ficha salva na nuvem.",
+    characterShareOfflineHelp:
+      "Conecte-se à internet para gerenciar o compartilhamento desta ficha.",
+    characterShareLoginRequiredHelp:
+      "Entre na conta proprietária para compartilhar esta ficha.",
+    characterShareUnavailableHelp:
+      "A API de nuvem não está configurada neste ambiente.",
+    characterShareWrongAccountHelp:
+      "Esta ficha pertence a outra conta. Entre na conta proprietária para gerenciar o compartilhamento.",
+    characterShareTitle: "Compartilhar ficha",
+    characterShareDescription: (name: string) =>
+      `Permita que outra pessoa visualize “${name}” em modo leitura.`,
+    characterShareTargetType: "Compartilhar por",
+    characterShareByEmail: "E-mail",
+    characterShareByPublicCode: "Código público",
+    characterShareEmailLabel: "E-mail da pessoa",
+    characterShareEmailPlaceholder: "pessoa@exemplo.com",
+    characterShareCodeLabel: "Código público da pessoa",
+    characterShareCodePlaceholder: "ABCDEF0123456789",
+    characterShareOwnCodeLabel: "Seu código público:",
+    characterShareSend: "Compartilhar",
+    characterShareSending: "Compartilhando...",
+    characterShareCurrentTitle: "Acessos atuais",
+    characterShareCurrentDescription:
+      "Essas pessoas podem abrir o último snapshot disponível na nuvem.",
+    characterShareLoading: "Carregando acessos...",
+    characterShareEmpty: "Esta ficha ainda não foi compartilhada.",
+    characterShareEmailTarget: "E-mail",
+    characterShareCodeTarget: "Código público",
+    characterShareCreatedAt: (date: string) => `criado em ${date}`,
+    characterShareRevoke: "Revogar",
+    characterShareRevoking: "Revogando...",
+    characterShareCreated:
+      "Compartilhamento criado. A resposta não informa se o e-mail já possui conta.",
+    characterShareAlreadyExists:
+      "Essa pessoa já possui um compartilhamento atual desta ficha.",
+    characterShareRevoked: "Acesso revogado.",
+    characterShareLoadError: "Não foi possível carregar os compartilhamentos.",
+    characterShareCreateError: "Não foi possível compartilhar esta ficha.",
+    characterShareRevokeError: "Não foi possível revogar este acesso.",
+    characterShareInvalidEmail: "Informe um endereço de e-mail válido.",
+    characterShareInvalidCode: "Informe um código público válido.",
+    characterShareTargetRequired: "Informe um e-mail ou código público.",
+    characterShareCannotShareWithSelf:
+      "Você já é o proprietário desta ficha e não precisa compartilhá-la consigo mesmo.",
+    characterShareInvalidTarget:
+      "Não foi possível usar esse destinatário. Revise o e-mail ou código público.",
+    characterShareCharacterUnavailable:
+      "A ficha cloud não está disponível para esta conta.",
+    characterShareOffline:
+      "Você está offline. Os acessos existentes continuam listados, mas não podem ser alterados agora.",
+    myCharacters: "Minhas fichas",
+    sharedCharactersNavigation: "Compartilhadas comigo",
+    sharedCharactersTitle: "Compartilhadas comigo",
+    sharedCharactersDescription:
+      "Fichas que outras pessoas compartilharam com você em modo leitura.",
+    sharedCharactersLoading: "Carregando fichas...",
+    sharedCharactersRefresh: "Atualizar",
+    sharedCharactersTryAgain: "Tentar novamente",
+    sharedCharactersEmpty: "Nenhuma ficha foi compartilhada com esta conta.",
+    sharedCharactersLoadError: "Não foi possível carregar as fichas compartilhadas.",
+    sharedCharactersUnavailable:
+      "A API de nuvem não está configurada neste ambiente.",
+    sharedCharactersLoginRequired:
+      "Entre na sua conta para ver as fichas compartilhadas com você.",
+    sharedCharactersLoginAction: "Entrar na conta",
+    sharedCharactersOffline:
+      "As fichas compartilhadas não ficam salvas offline. Conecte-se à internet para visualizá-las.",
+    sharedCharactersBack: "Voltar para compartilhadas",
+    sharedCharacterLoading: "Carregando ficha compartilhada...",
+    sharedCharacterLoadError: "Não foi possível carregar esta ficha compartilhada.",
+    sharedCharacterNotFound:
+      "Esta ficha não está mais disponível ou o acesso foi revogado.",
+    sharedCharacterUnavailableTitle: "Ficha indisponível",
+    sharedCharacterReadOnlyLabel: "Modo leitura",
+    sharedCharacterOwnerLabel: "Compartilhada por",
+    sharedCharacterOwnerUnknown: "Proprietário",
+    sharedCharacterRevisionLabel: "Revisão",
+    sharedCharacterUpdatedLabel: "Atualizada em",
+    sharedCharacterRevisionShort: (revision: number) => `rev. ${revision}`,
+    sharedCharacterOpen: "Abrir ficha",
     deleteCharacter: "Apagar personagem",
     delete: "Apagar",
     deletePrompt: "Para apagar este personagem, digite exatamente:",
@@ -321,6 +404,89 @@ export const appTexts = {
     cloudSyncActivatedWithQueuedChanges:
       "Sync enabled. Changes made during upload are queued for the next synchronization.",
     cloudSyncActivateError: "Could not enable sync for this character.",
+    characterShareButton: "Share",
+    characterShareButtonHelp:
+      "Manage who can view the cloud version of this character.",
+    characterShareOfflineHelp:
+      "Connect to the internet to manage sharing for this character.",
+    characterShareLoginRequiredHelp:
+      "Sign in to the owner account to share this character.",
+    characterShareUnavailableHelp:
+      "The cloud API is not configured in this environment.",
+    characterShareWrongAccountHelp:
+      "This character belongs to another account. Sign in to the owner account to manage sharing.",
+    characterShareTitle: "Share character",
+    characterShareDescription: (name: string) =>
+      `Allow another person to view “${name}” in read-only mode.`,
+    characterShareTargetType: "Share by",
+    characterShareByEmail: "E-mail",
+    characterShareByPublicCode: "Public code",
+    characterShareEmailLabel: "Person's e-mail",
+    characterShareEmailPlaceholder: "person@example.com",
+    characterShareCodeLabel: "Person's public code",
+    characterShareCodePlaceholder: "ABCDEF0123456789",
+    characterShareOwnCodeLabel: "Your public code:",
+    characterShareSend: "Share",
+    characterShareSending: "Sharing...",
+    characterShareCurrentTitle: "Current access",
+    characterShareCurrentDescription:
+      "These people can open the latest snapshot available in the cloud.",
+    characterShareLoading: "Loading access...",
+    characterShareEmpty: "This character has not been shared yet.",
+    characterShareEmailTarget: "E-mail",
+    characterShareCodeTarget: "Public code",
+    characterShareCreatedAt: (date: string) => `created on ${date}`,
+    characterShareRevoke: "Revoke",
+    characterShareRevoking: "Revoking...",
+    characterShareCreated:
+      "Sharing created. The response does not reveal whether the e-mail already has an account.",
+    characterShareAlreadyExists:
+      "This person already has a current share for this character.",
+    characterShareRevoked: "Access revoked.",
+    characterShareLoadError: "Could not load character shares.",
+    characterShareCreateError: "Could not share this character.",
+    characterShareRevokeError: "Could not revoke this access.",
+    characterShareInvalidEmail: "Enter a valid e-mail address.",
+    characterShareInvalidCode: "Enter a valid public code.",
+    characterShareTargetRequired: "Enter an e-mail address or public code.",
+    characterShareCannotShareWithSelf:
+      "You already own this character and do not need to share it with yourself.",
+    characterShareInvalidTarget:
+      "That recipient could not be used. Check the e-mail address or public code.",
+    characterShareCharacterUnavailable:
+      "The cloud character is not available to this account.",
+    characterShareOffline:
+      "You are offline. Existing access remains listed, but it cannot be changed now.",
+    myCharacters: "My characters",
+    sharedCharactersNavigation: "Shared with me",
+    sharedCharactersTitle: "Shared with me",
+    sharedCharactersDescription:
+      "Characters other people shared with you in read-only mode.",
+    sharedCharactersLoading: "Loading characters...",
+    sharedCharactersRefresh: "Refresh",
+    sharedCharactersTryAgain: "Try again",
+    sharedCharactersEmpty: "No character has been shared with this account.",
+    sharedCharactersLoadError: "Could not load shared characters.",
+    sharedCharactersUnavailable:
+      "The cloud API is not configured in this environment.",
+    sharedCharactersLoginRequired:
+      "Sign in to see characters shared with you.",
+    sharedCharactersLoginAction: "Sign in",
+    sharedCharactersOffline:
+      "Shared characters are not stored offline. Connect to the internet to view them.",
+    sharedCharactersBack: "Back to shared characters",
+    sharedCharacterLoading: "Loading shared character...",
+    sharedCharacterLoadError: "Could not load this shared character.",
+    sharedCharacterNotFound:
+      "This character is no longer available or access was revoked.",
+    sharedCharacterUnavailableTitle: "Character unavailable",
+    sharedCharacterReadOnlyLabel: "Read-only mode",
+    sharedCharacterOwnerLabel: "Shared by",
+    sharedCharacterOwnerUnknown: "Owner",
+    sharedCharacterRevisionLabel: "Revision",
+    sharedCharacterUpdatedLabel: "Updated at",
+    sharedCharacterRevisionShort: (revision: number) => `rev. ${revision}`,
+    sharedCharacterOpen: "Open character",
     deleteCharacter: "Delete character",
     delete: "Delete",
     deletePrompt: "To delete this character, type exactly:",

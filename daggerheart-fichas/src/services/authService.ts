@@ -3,6 +3,7 @@ import { apiClient } from "./apiClient";
 export type UserAccount = {
   id: string;
   email: string;
+  publicUserCode?: string;
   displayName?: string;
   createdAt?: string;
   updatedAt?: string;

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Cookie, Depends, Request, Response, status
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -31,6 +32,12 @@ from app.schemas.auth import (
     RegisterRequest,
     UserPublic,
 )
+from app.services.share_target_service import (
+    PendingShareActivationResult,
+    activate_pending_shares_for_user,
+)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -132,6 +139,39 @@ async def revoke_refresh_session(session: AsyncSession, refresh_session: Refresh
     await session.flush()
 
 
+async def activate_pending_shares_after_auth(
+    session: AsyncSession,
+    *,
+    user: User,
+) -> PendingShareActivationResult | None:
+    """Activate pending shares without making authentication depend on it.
+
+    A nested transaction isolates stale data or a temporarily unavailable sharing
+    table from the login/registration transaction. A later login can retry the
+    activation because the operation is idempotent.
+    """
+    try:
+        async with session.begin_nested():
+            result = await activate_pending_shares_for_user(session, user=user)
+    except SQLAlchemyError:
+        logger.exception(
+            "Could not activate pending character shares after authentication",
+            extra={"user_id": str(user.id)},
+        )
+        return None
+
+    if result.changed_count:
+        logger.info(
+            "Activated pending character shares after authentication",
+            extra={
+                "user_id": str(user.id),
+                "activated_count": len(result.activated),
+                "superseded_count": len(result.superseded),
+            },
+        )
+    return result
+
+
 @router.post(
     "/register",
     response_model=LoginResponse,
@@ -171,6 +211,7 @@ async def register(
             device_id=input_data.device_id,
             user_agent=get_user_agent(request),
         )
+        await activate_pending_shares_after_auth(session, user=user)
         await session.commit()
     except IntegrityError as exc:
         await session.rollback()
@@ -224,6 +265,7 @@ async def login(
         device_id=input_data.device_id,
         user_agent=get_user_agent(request),
     )
+    await activate_pending_shares_after_auth(session, user=user)
     await session.commit()
     await session.refresh(user)
 

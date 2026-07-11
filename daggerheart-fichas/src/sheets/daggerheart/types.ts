@@ -157,6 +157,8 @@ export type DaggerheartTexts = {
   invalidClassMessage: string;
   customSheetTitle: string;
   unsupportedSystemMessage: string;
+  readOnlyMode: string;
+  readOnlyDescription: string;
 
   name: string;
   pronouns: string;

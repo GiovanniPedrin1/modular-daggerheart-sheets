@@ -16,3 +16,11 @@ export function getInitialRouteCharacterId() {
   const match = window.location.pathname.match(/^\/character\/([^/]+)$/);
   return getDecodedRouteParam(match?.[1]);
 }
+
+export function getSharedCharactersRoutePath() {
+  return "/shared";
+}
+
+export function getSharedCharacterRoutePath(characterId: string) {
+  return `/shared/character/${encodeURIComponent(characterId)}`;
+}

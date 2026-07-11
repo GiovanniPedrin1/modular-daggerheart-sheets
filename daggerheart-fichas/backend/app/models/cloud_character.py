@@ -12,6 +12,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 if TYPE_CHECKING:
+    from app.models.character_share import CharacterShare
     from app.models.user import User
 
 
@@ -104,3 +105,7 @@ class CloudCharacter(Base):
     )
 
     owner: Mapped[User] = relationship(back_populates="cloud_characters")
+    shares: Mapped[list[CharacterShare]] = relationship(
+        back_populates="character",
+        cascade="all, delete-orphan",
+    )

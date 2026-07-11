@@ -48,6 +48,7 @@ type DaggerheartSheetProps = {
   language: Language;
   definition: DaggerheartClassDefinition;
   initialData?: DaggerheartCharacterData;
+  readOnly?: boolean;
   saveStatusLabel?: string;
   saveStatusKind?: "editing" | "saving" | "saved" | "error";
   onSheetDataChange?: (data: DaggerheartCharacterData) => void;
@@ -61,6 +62,7 @@ export function DaggerheartSheet({
   language,
   definition,
   initialData = {},
+  readOnly = false,
   saveStatusLabel,
   saveStatusKind,
   onSheetDataChange,
@@ -172,6 +174,8 @@ export function DaggerheartSheet({
   }
 
   function markEditingStarted() {
+    if (readOnly) return;
+
     if (editingEndTimerRef.current) {
       clearTimeout(editingEndTimerRef.current);
       editingEndTimerRef.current = null;
@@ -181,6 +185,8 @@ export function DaggerheartSheet({
   }
 
   function markEditingEndedSoon() {
+    if (readOnly) return;
+
     if (editingEndTimerRef.current) {
       clearTimeout(editingEndTimerRef.current);
     }
@@ -192,6 +198,7 @@ export function DaggerheartSheet({
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLFormElement>) {
+    if (readOnly) return;
     if (!isTypingKey(event)) return;
 
     activeTypingKeysRef.current.add(event.code || event.key);
@@ -199,6 +206,7 @@ export function DaggerheartSheet({
   }
 
   function handleKeyUp(event: KeyboardEvent<HTMLFormElement>) {
+    if (readOnly) return;
     if (!isTypingKey(event)) return;
 
     activeTypingKeysRef.current.delete(event.code || event.key);
@@ -209,14 +217,17 @@ export function DaggerheartSheet({
   }
 
   function handleCompositionStart() {
+    if (readOnly) return;
     markEditingStarted();
   }
 
   function handleCompositionEnd() {
+    if (readOnly) return;
     markEditingEndedSoon();
   }
 
   function handleBlur() {
+    if (readOnly) return;
     activeTypingKeysRef.current.clear();
     markEditingEndedSoon();
   }
@@ -241,12 +252,15 @@ export function DaggerheartSheet({
   }
 
   function handleFormChange() {
+    if (readOnly) return;
     if (!onSheetDataChange) return;
 
     onSheetDataChange(buildSheetDataPatch());
   }
 
   function handleDetailsChange(nextDetailsPage: DaggerheartDetailsPage) {
+    if (readOnly) return;
+
     shouldPersistDetailsPageRef.current = true;
     detailsPageRef.current = nextDetailsPage;
     setDetailsPage(nextDetailsPage);
@@ -262,6 +276,8 @@ export function DaggerheartSheet({
   }
 
   function handleTrackerMaxChange(name: TrackerName, nextMax: number) {
+    if (readOnly) return;
+
     const currentMax = trackerMaxes[name];
     const clampedMax = parseTrackerMax(nextMax);
 
@@ -291,18 +307,24 @@ export function DaggerheartSheet({
   return (
     <form
       ref={formRef}
-      className={`dh-sheet ${decorationClassName}`.trim()}
+      className={`dh-sheet ${decorationClassName} ${readOnly ? "is-readonly" : ""}`.trim()}
       autoComplete="off"
       lang={language}
-      onInput={handleFormChange}
-      onChange={handleFormChange}
-      onKeyDown={handleKeyDown}
-      onKeyUp={handleKeyUp}
-      onCompositionStart={handleCompositionStart}
-      onCompositionEnd={handleCompositionEnd}
-      onBlur={handleBlur}
+      aria-readonly={readOnly || undefined}
+      onInput={readOnly ? undefined : handleFormChange}
+      onChange={readOnly ? undefined : handleFormChange}
+      onKeyDown={readOnly ? undefined : handleKeyDown}
+      onKeyUp={readOnly ? undefined : handleKeyUp}
+      onCompositionStart={readOnly ? undefined : handleCompositionStart}
+      onCompositionEnd={readOnly ? undefined : handleCompositionEnd}
+      onBlur={readOnly ? undefined : handleBlur}
     >
-      {saveStatusLabel ? (
+      {readOnly ? (
+        <div className="dh-readonly-banner" role="status">
+          <strong>{t.readOnlyMode}</strong>
+          <span>{t.readOnlyDescription}</span>
+        </div>
+      ) : saveStatusLabel ? (
         <div
           className={`dh-save-status ${saveStatusKind ? `is-${saveStatusKind}` : ""}`}
           aria-live="polite"
@@ -311,16 +333,18 @@ export function DaggerheartSheet({
         </div>
       ) : null}
 
-      <SheetHeader
-        characterName={
-          typeof initialFields.char_name === "string" && initialFields.char_name.trim()
-            ? initialFields.char_name
-            : character.name
-        }
-        definition={definition}
-        language={language}
-        t={t}
-      />
+      <fieldset className="dh-readonly-scope" disabled={readOnly}>
+        <SheetHeader
+          characterName={
+            typeof initialFields.char_name === "string" && initialFields.char_name.trim()
+              ? initialFields.char_name
+              : character.name
+          }
+          definition={definition}
+          language={language}
+          t={t}
+        />
+      </fieldset>
 
       <nav className="dh-tabs" aria-label={t.tabs.sheetNavigation}>
         <button
@@ -359,60 +383,62 @@ export function DaggerheartSheet({
         ) : null}
       </nav>
 
-      {activeTab === "sheet" ? (
-        <main className="dh-content dh-stack">
-          <TraitsSection language={language} t={t} />
+      <fieldset className="dh-readonly-scope" disabled={readOnly}>
+        {activeTab === "sheet" ? (
+          <main className="dh-content dh-stack">
+            <TraitsSection language={language} t={t} />
 
-          <div className="dh-grid-2">
-            <div className="dh-stack">
-              <SummarySection t={t} evasionStart={definition.evasionStart} />
-              <DamageHealthSection
-                t={t}
-                trackerMaxes={trackerMaxes}
-                onTrackerMaxChange={handleTrackerMaxChange}
-              />
-              <HopeSection t={t} language={language} feature={definition.hopeFeature} />
-              <ExperiencesSection t={t} />
-              <GoldSection t={t} />
-              <ClassFeatureSection
-                feature={definition.classFeature}
-                language={language}
-                t={t}
-              />
+            <div className="dh-grid-2">
+              <div className="dh-stack">
+                <SummarySection t={t} evasionStart={definition.evasionStart} />
+                <DamageHealthSection
+                  t={t}
+                  trackerMaxes={trackerMaxes}
+                  onTrackerMaxChange={handleTrackerMaxChange}
+                />
+                <HopeSection t={t} language={language} feature={definition.hopeFeature} />
+                <ExperiencesSection t={t} />
+                <GoldSection t={t} />
+                <ClassFeatureSection
+                  feature={definition.classFeature}
+                  language={language}
+                  t={t}
+                />
+              </div>
+
+              <div className="dh-stack">
+                <WeaponsSection t={t} />
+                <ArmorSection t={t} />
+                <InventorySection t={t} />
+              </div>
             </div>
 
-            <div className="dh-stack">
-              <WeaponsSection t={t} />
-              <ArmorSection t={t} />
-              <InventorySection t={t} />
-            </div>
-          </div>
+            <p className="dh-print-note">{t.printNote}</p>
+          </main>
+        ) : null}
 
-          <p className="dh-print-note">{t.printNote}</p>
-        </main>
-      ) : null}
+        {activeTab === "details" ? (
+          <main className="dh-content dh-stack">
+            <DaggerheartDetailsTab
+              value={detailsPage}
+              t={t}
+              onChange={handleDetailsChange}
+            />
+          </main>
+        ) : null}
 
-      {activeTab === "details" ? (
-        <main className="dh-content dh-stack">
-          <DaggerheartDetailsTab
-            value={detailsPage}
-            t={t}
-            onChange={handleDetailsChange}
-          />
-        </main>
-      ) : null}
+        {activeTab === "progression" ? (
+          <main className="dh-content dh-stack">
+            <ProgressionTab definition={definition} language={language} t={t} />
+          </main>
+        ) : null}
 
-      {activeTab === "progression" ? (
-        <main className="dh-content dh-stack">
-          <ProgressionTab definition={definition} language={language} t={t} />
-        </main>
-      ) : null}
-
-      {activeTab === "classExtras" && hasClassExtras ? (
-        <main className="dh-content dh-stack">
-          <ClassExtrasTab definition={definition} language={language} t={t} />
-        </main>
-      ) : null}
+        {activeTab === "classExtras" && hasClassExtras ? (
+          <main className="dh-content dh-stack">
+            <ClassExtrasTab definition={definition} language={language} t={t} />
+          </main>
+        ) : null}
+      </fieldset>
     </form>
   );
 }

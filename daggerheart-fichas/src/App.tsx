@@ -5,10 +5,12 @@ import { AppTopbar } from "./components/app/AppTopbar";
 import { AuthModal } from "./components/app/AuthModal";
 import { CharacterCreateModal } from "./components/app/CharacterCreateModal";
 import { CharacterDeleteModal } from "./components/app/CharacterDeleteModal";
+import { CharacterShareModal } from "./components/app/CharacterShareModal";
 import { ClearLocalDataModal } from "./components/app/ClearLocalDataModal";
 import { RestoreMergeModal } from "./components/app/RestoreMergeModal";
 import { RestoreReplaceModal } from "./components/app/RestoreReplaceModal";
 import { SettingsModal } from "./components/app/SettingsModal";
+import { SharedCharactersView } from "./components/app/SharedCharactersView";
 import type { AuthMessage, AuthMode, SettingsMessage } from "./components/app/appTypes";
 import { getAppVersionLabel } from "./config/appVersion";
 import { useCharacterAutosave } from "./hooks/useCharacterAutosave";
@@ -19,6 +21,7 @@ import {
   createCharacter,
   deleteCharacter,
   getNextLocalEditSyncStatus,
+  isReadonlyCharacter,
   listActiveCharacters,
   type CharacterRecord,
   type CharacterSystem,
@@ -40,6 +43,8 @@ import {
   getCharacterRoutePath,
   getDecodedRouteParam,
   getInitialRouteCharacterId,
+  getSharedCharacterRoutePath,
+  getSharedCharactersRoutePath,
 } from "./services/routing";
 import {
   getOrCreateDeviceId,
@@ -72,9 +77,19 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const characterRouteMatch = useMatch("/character/:characterId");
+  const sharedCharacterRouteMatch = useMatch(
+    "/shared/character/:characterId"
+  );
+  const isSharedCharactersIndexRoute = Boolean(useMatch("/shared"));
   const isSettingsRoute = Boolean(useMatch("/settings"));
   const routeCharacterId = getDecodedRouteParam(
     characterRouteMatch?.params.characterId
+  );
+  const routeSharedCharacterId = getDecodedRouteParam(
+    sharedCharacterRouteMatch?.params.characterId
+  );
+  const isSharedCharactersView = Boolean(
+    isSharedCharactersIndexRoute || sharedCharacterRouteMatch
   );
 
   const [booted, setBooted] = useState(false);
@@ -101,6 +116,8 @@ export default function App() {
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isCharacterShareModalOpen, setIsCharacterShareModalOpen] =
+    useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
 
@@ -150,6 +167,9 @@ export default function App() {
   const selectedCharacter = useMemo(() => {
     return characters.find((character) => character.id === selectedCharacterId);
   }, [characters, selectedCharacterId]);
+  const selectedCharacterIsReadOnly = Boolean(
+    selectedCharacter && isReadonlyCharacter(selectedCharacter)
+  );
 
   const {
     saveStatus,
@@ -161,6 +181,7 @@ export default function App() {
     resetSaveStatus,
   } = useCharacterAutosave({
     selectedCharacter,
+    readOnly: selectedCharacterIsReadOnly,
     onOptimisticCharacterChange: (characterId, change) => {
       setCharacters((current) =>
         current.map((character) =>
@@ -212,6 +233,7 @@ export default function App() {
 
   const canDeleteSelectedCharacter =
     Boolean(selectedCharacter) &&
+    !selectedCharacterIsReadOnly &&
     deleteConfirmationName.trim() === selectedCharacter?.name;
 
   const canClearLocalData = clearConfirmation.trim() === t.clearDataToken;
@@ -240,6 +262,32 @@ export default function App() {
         : !currentUser
           ? t.cloudSyncLoginRequiredHelp
           : t.cloudSyncActivateHelp;
+
+  const selectedCharacterCanBeShared = Boolean(
+    selectedCharacter?.remoteId &&
+      !selectedCharacterIsReadOnly &&
+      selectedCharacter.permission !== "viewer"
+  );
+  const selectedCharacterOwnerMatchesCurrentUser = Boolean(
+    currentUser &&
+      (!selectedCharacter?.ownerUserId ||
+        selectedCharacter.ownerUserId === currentUser.id)
+  );
+  const canAttemptSelectedCharacterShare =
+    selectedCharacterCanBeShared &&
+    canUseCloud &&
+    !isCloudSessionLoading &&
+    !isCloudActionPending &&
+    (!currentUser || selectedCharacterOwnerMatchesCurrentUser);
+  const selectedCharacterShareButtonTitle = !cloudApiConfigured
+    ? t.characterShareUnavailableHelp
+    : !isOnline
+      ? t.characterShareOfflineHelp
+      : !currentUser
+        ? t.characterShareLoginRequiredHelp
+        : !selectedCharacterOwnerMatchesCurrentUser
+          ? t.characterShareWrongAccountHelp
+          : t.characterShareButtonHelp;
 
   useEffect(() => {
     let cancelled = false;
@@ -519,8 +567,29 @@ export default function App() {
   ) {
     setSelectedCharacterId(characterId);
     setCloudCharacterMessage(null);
+    setIsCharacterShareModalOpen(false);
     resetSaveStatus();
     navigate(characterId ? getCharacterRoutePath(characterId) : "/", options);
+  }
+
+  function navigateToOwnedCharacters() {
+    setCloudCharacterMessage(null);
+    setIsCharacterShareModalOpen(false);
+    navigate(
+      selectedCharacterId ? getCharacterRoutePath(selectedCharacterId) : "/"
+    );
+  }
+
+  function navigateToSharedCharacters() {
+    setCloudCharacterMessage(null);
+    setIsCharacterShareModalOpen(false);
+    resetSaveStatus();
+    navigate(getSharedCharactersRoutePath());
+  }
+
+  function navigateToSharedCharacter(characterId: string) {
+    resetSaveStatus();
+    navigate(getSharedCharacterRoutePath(characterId));
   }
 
   function closeSettings() {
@@ -688,6 +757,12 @@ export default function App() {
 
       setCurrentUser(null);
       setCloudBackups([]);
+      setIsCharacterShareModalOpen(false);
+      if (isSharedCharactersView) {
+        navigate(
+          selectedCharacterId ? getCharacterRoutePath(selectedCharacterId) : "/"
+        );
+      }
       setAuthPassword("");
       setAuthPasswordConfirmation("");
       setAuthMessage(null);
@@ -964,6 +1039,28 @@ export default function App() {
     }
   }
 
+  function handleOpenSelectedCharacterShare() {
+    if (!selectedCharacterCanBeShared) return;
+
+    if (!currentUser) {
+      openLoginModal("login");
+      return;
+    }
+
+    if (!selectedCharacterOwnerMatchesCurrentUser) {
+      setCloudCharacterMessage({
+        kind: "error",
+        text: t.characterShareWrongAccountHelp,
+      });
+      return;
+    }
+
+    if (!canAttemptSelectedCharacterShare) return;
+
+    setCloudCharacterMessage(null);
+    setIsCharacterShareModalOpen(true);
+  }
+
   function getCharacterClassLabel(character: CharacterRecord) {
     if (!character.class) return "";
 
@@ -1007,6 +1104,9 @@ export default function App() {
           language={language}
           currentUser={currentUser}
           accountButtonLabel={accountButtonLabel}
+          isSharedCharactersView={isSharedCharactersView}
+          onOpenOwnedCharacters={navigateToOwnedCharacters}
+          onOpenSharedCharacters={navigateToSharedCharacters}
           onSelectCharacter={navigateToCharacter}
           onOpenCreateModal={() => setIsCreateModalOpen(true)}
           onOpenDeleteModal={() => {
@@ -1017,6 +1117,9 @@ export default function App() {
           isCharacterSyncActivating={isSelectedCharacterSyncActivating}
           characterSyncButtonTitle={selectedCharacterSyncButtonTitle}
           onActivateCharacterSync={handleActivateSelectedCharacterSync}
+          canAttemptCharacterShare={canAttemptSelectedCharacterShare}
+          characterShareButtonTitle={selectedCharacterShareButtonTitle}
+          onOpenCharacterShare={handleOpenSelectedCharacterShare}
           onOpenSettings={() => {
             setSettingsMessage(null);
             setIsSettingsModalOpen(true);
@@ -1028,14 +1131,14 @@ export default function App() {
         />
 
         <main className="sheet-area">
-          {!isOnline && (
+          {!isOnline && !isSharedCharactersView && (
             <div className="offline-banner" role="status" aria-live="polite">
               <strong>{t.offlineBannerTitle}</strong>
               <span>{t.offlineBannerDescription}</span>
             </div>
           )}
 
-          {cloudCharacterMessage && (
+          {!isSharedCharactersView && cloudCharacterMessage && (
             <div
               className={`cloud-character-message ${cloudCharacterMessage.kind}`}
               role={cloudCharacterMessage.kind === "error" ? "alert" : "status"}
@@ -1045,11 +1148,26 @@ export default function App() {
             </div>
           )}
 
-          {selectedCharacter ? (
+          {isSharedCharactersView ? (
+            <SharedCharactersView
+              key={currentUser?.id ?? "guest"}
+              t={t}
+              language={language}
+              currentUser={currentUser}
+              cloudApiConfigured={cloudApiConfigured}
+              isOnline={isOnline}
+              characterId={routeSharedCharacterId}
+              classDecorationsEnabled={classDecorationsEnabled}
+              onOpenLogin={() => openLoginModal("login")}
+              onOpenCharacter={navigateToSharedCharacter}
+              onBackToList={navigateToSharedCharacters}
+            />
+          ) : selectedCharacter ? (
             <SheetRenderer
               key={`${selectedCharacter.id}-${language}`}
               character={selectedCharacter}
               language={language}
+              readOnly={selectedCharacterIsReadOnly}
               saveStatusLabel={saveStatusLabel}
               saveStatusKind={saveStatus === "idle" ? undefined : saveStatus}
               onSheetDataChange={handleSheetDataChange}
@@ -1079,6 +1197,20 @@ export default function App() {
           onConfirm={handleCreateCharacter}
         />
       )}
+
+      {isCharacterShareModalOpen &&
+        selectedCharacter &&
+        selectedCharacter.remoteId &&
+        currentUser && (
+          <CharacterShareModal
+            t={t}
+            character={selectedCharacter}
+            currentUser={currentUser}
+            canUseCloud={canUseCloud}
+            language={language}
+            onClose={() => setIsCharacterShareModalOpen(false)}
+          />
+        )}
 
       {shouldShowSettingsModal && (
         <SettingsModal
