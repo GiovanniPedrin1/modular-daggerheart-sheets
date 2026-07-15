@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.auth import router as auth_router
 from app.api.backups import router as backups_router
+from app.api.character_event_stream import router as character_event_stream_router
 from app.api.characters import router as characters_router
 from app.api.health import router as health_router
 from app.api.shared_characters import router as shared_characters_router
@@ -50,3 +51,4 @@ app.include_router(auth_router)
 app.include_router(backups_router)
 app.include_router(characters_router)
 app.include_router(shared_characters_router)
+app.include_router(character_event_stream_router)

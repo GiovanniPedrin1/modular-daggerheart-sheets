@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     supported_local_backup_format_version: int = 1
     max_cloud_character_payload_bytes: int = 2 * 1024 * 1024
     supported_cloud_character_schema_version: int = 1
+    character_event_retention_days: int = 30
+    character_event_retention_revisions: int = 500
+    character_event_replay_batch_size: int = 100
+    character_event_poll_interval_seconds: float = 1.0
+    character_event_heartbeat_seconds: float = 15.0
+    character_event_access_recheck_seconds: float = 5.0
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -75,6 +81,20 @@ class Settings(BaseSettings):
             raise ValueError(
                 "SUPPORTED_CLOUD_CHARACTER_SCHEMA_VERSION must be greater than zero"
             )
+        return value
+
+    @field_validator(
+        "character_event_retention_days",
+        "character_event_retention_revisions",
+        "character_event_replay_batch_size",
+        "character_event_poll_interval_seconds",
+        "character_event_heartbeat_seconds",
+        "character_event_access_recheck_seconds",
+    )
+    @classmethod
+    def require_positive_character_event_setting(cls, value: int | float, info) -> int | float:
+        if value <= 0:
+            raise ValueError(f"{info.field_name.upper()} must be greater than zero")
         return value
 
     @field_validator("cloud_backup_retention_limit")

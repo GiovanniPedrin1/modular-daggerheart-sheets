@@ -12,6 +12,7 @@ from app.core.user_codes import generate_public_user_code
 from app.db.base import Base
 
 if TYPE_CHECKING:
+    from app.models.character_mutation import CharacterMutation
     from app.models.character_share import CharacterShare
     from app.models.cloud_backup import CloudBackup
     from app.models.cloud_character import CloudCharacter
@@ -54,6 +55,10 @@ class User(Base):
     )
     cloud_backups: Mapped[list[CloudBackup]] = relationship(
         back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    character_mutations: Mapped[list[CharacterMutation]] = relationship(
+        back_populates="owner",
         cascade="all, delete-orphan",
     )
     cloud_characters: Mapped[list[CloudCharacter]] = relationship(

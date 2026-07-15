@@ -6,14 +6,26 @@ import {
   listSharedCharacters,
 } from "../../services/sharedCharacterService";
 import { SheetRenderer } from "../../sheets/registry";
+import {
+  closeCharacterEventStream,
+  openCharacterEventStream,
+  type CharacterEventStreamController,
+  type CharacterRealtimeConnectionState,
+} from "../../services/realtimeCharacterService";
 import type { Language } from "../../sheets/daggerheart/types";
 import type {
   SharedCharacter,
   SharedCharacterListItem,
 } from "../../types/sharedCharacter";
 import type { AppText } from "./appTypes";
+import { SharedCharacterConnectionStatus } from "./SharedCharacterConnectionStatus";
 
 type LoadingState = "idle" | "loading" | "success" | "error";
+type TerminalDetailReason = "share_revoked" | "deleted";
+type TerminalDetailState = {
+  characterId: string;
+  reason: TerminalDetailReason;
+};
 
 type SharedCharactersViewProps = {
   t: AppText;
@@ -64,6 +76,11 @@ export function SharedCharactersView({
   const [listError, setListError] = useState("");
   const [detailError, setDetailError] = useState("");
   const [refreshVersion, setRefreshVersion] = useState(0);
+  const [detailReloadVersion, setDetailReloadVersion] = useState(0);
+  const [terminalDetail, setTerminalDetail] =
+    useState<TerminalDetailState | null>(null);
+  const [realtimeConnectionState, setRealtimeConnectionState] =
+    useState<CharacterRealtimeConnectionState>("closed");
 
   const canLoadSharedCharacters = Boolean(
     cloudApiConfigured && isOnline && currentUser
@@ -76,6 +93,8 @@ export function SharedCharactersView({
     setDetailState("idle");
     setListError("");
     setDetailError("");
+    setTerminalDetail(null);
+    setRealtimeConnectionState("closed");
   }, [currentUser?.id]);
 
   useEffect(() => {
@@ -92,7 +111,13 @@ export function SharedCharactersView({
 
     listSharedCharacters({ signal: controller.signal })
       .then((response) => {
-        setCharacters(response.characters);
+        setCharacters(
+          terminalDetail
+            ? response.characters.filter(
+                (character) => character.id !== terminalDetail.characterId
+              )
+            : response.characters
+        );
         setListState("success");
       })
       .catch((error: unknown) => {
@@ -104,29 +129,138 @@ export function SharedCharactersView({
       });
 
     return () => controller.abort();
-  }, [canLoadSharedCharacters, currentUser?.id, refreshVersion, t]);
+  }, [
+    canLoadSharedCharacters,
+    currentUser?.id,
+    refreshVersion,
+    t,
+    terminalDetail,
+  ]);
 
   useEffect(() => {
     setSelectedCharacter(null);
     setDetailError("");
+    setRealtimeConnectionState(characterId ? "connecting" : "closed");
 
     if (!characterId) {
+      setRealtimeConnectionState("closed");
       setDetailState("idle");
       return;
     }
 
+    if (terminalDetail?.characterId === characterId) {
+      setRealtimeConnectionState("closed");
+      setDetailState("error");
+      setDetailError(
+        terminalDetail.reason === "share_revoked"
+          ? t.sharedCharacterAccessRevoked
+          : t.sharedCharacterDeleted
+      );
+      return;
+    }
+
     if (!canLoadSharedCharacters) {
+      setRealtimeConnectionState(isOnline ? "closed" : "offline");
       setDetailState("idle");
       return;
     }
 
     const controller = new AbortController();
+    let realtimeController: CharacterEventStreamController | null = null;
+    let resyncRequested = false;
+    setRealtimeConnectionState("connecting");
     setDetailState("loading");
 
     getSharedCharacter(characterId, { signal: controller.signal })
       .then((response) => {
+        if (controller.signal.aborted) return;
+
         setSelectedCharacter(response.character);
         setDetailState("success");
+
+        try {
+          realtimeController = openCharacterEventStream({
+            characterId: response.character.id,
+            sinceRevision: response.character.serverRevision,
+            signal: controller.signal,
+            onUpdated: (event) => {
+              setSelectedCharacter((current) => {
+                if (
+                  !current ||
+                  current.id !== event.characterId ||
+                  event.serverRevision <= current.serverRevision
+                ) {
+                  return current;
+                }
+
+                return {
+                  ...current,
+                  name: event.snapshot.name,
+                  system: event.snapshot.system,
+                  classKey: event.snapshot.classKey,
+                  language: event.snapshot.language,
+                  data: event.snapshot.data,
+                  serverRevision: event.serverRevision,
+                  schemaVersion: event.snapshot.schemaVersion,
+                  updatedAt: event.snapshot.updatedAt,
+                };
+              });
+            },
+            onConnectionStateChange: setRealtimeConnectionState,
+            onFullResyncRequired: (event) => {
+              if (controller.signal.aborted || resyncRequested) {
+                return;
+              }
+
+              resyncRequested = true;
+              console.info(
+                "Shared character realtime history requires a full resync:",
+                event.reason
+              );
+              setDetailReloadVersion((current) => current + 1);
+            },
+            onShareRevoked: (event) => {
+              if (controller.signal.aborted) {
+                return;
+              }
+
+              setCharacters((current) =>
+                current.filter((character) => character.id !== event.characterId)
+              );
+              setSelectedCharacter(null);
+              setDetailError(t.sharedCharacterAccessRevoked);
+              setDetailState("error");
+              setTerminalDetail({
+                characterId: event.characterId,
+                reason: "share_revoked",
+              });
+            },
+            onDeleted: (event) => {
+              if (controller.signal.aborted) {
+                return;
+              }
+
+              setCharacters((current) =>
+                current.filter((character) => character.id !== event.characterId)
+              );
+              setSelectedCharacter(null);
+              setDetailError(t.sharedCharacterDeleted);
+              setDetailState("error");
+              setTerminalDetail({
+                characterId: event.characterId,
+                reason: "deleted",
+              });
+            },
+            onError: (error) => {
+              console.error("Shared character realtime stream error:", error);
+            },
+          });
+        } catch (error) {
+          setRealtimeConnectionState("closed");
+          // Realtime is an enhancement: keep the HTTP snapshot available when
+          // EventSource is unavailable or the stream cannot be initialized.
+          console.error("Could not open shared character realtime stream:", error);
+        }
       })
       .catch((error: unknown) => {
         if (isCancelledRequest(error)) return;
@@ -141,11 +275,24 @@ export function SharedCharactersView({
         } else {
           setDetailError(getErrorText(error, t.sharedCharacterLoadError));
         }
+        setRealtimeConnectionState("closed");
         setDetailState("error");
       });
 
-    return () => controller.abort();
-  }, [canLoadSharedCharacters, characterId, currentUser?.id, refreshVersion, t]);
+    return () => {
+      controller.abort();
+      closeCharacterEventStream(realtimeController);
+    };
+  }, [
+    canLoadSharedCharacters,
+    characterId,
+    currentUser?.id,
+    detailReloadVersion,
+    isOnline,
+    refreshVersion,
+    t,
+    terminalDetail,
+  ]);
 
   const selectedSheetCharacter = useMemo(() => {
     if (!selectedCharacter) return null;
@@ -161,8 +308,20 @@ export function SharedCharactersView({
   }, [selectedCharacter]);
 
   function refresh() {
+    if (!characterId) {
+      setTerminalDetail(null);
+    }
     setRefreshVersion((current) => current + 1);
   }
+
+  const selectedTerminalDetail =
+    terminalDetail?.characterId === characterId ? terminalDetail : null;
+  const detailErrorTitle =
+    selectedTerminalDetail?.reason === "share_revoked"
+      ? t.sharedCharacterAccessRevokedTitle
+      : selectedTerminalDetail?.reason === "deleted"
+        ? t.sharedCharacterDeletedTitle
+        : t.sharedCharacterUnavailableTitle;
 
   if (!cloudApiConfigured) {
     return (
@@ -202,16 +361,18 @@ export function SharedCharactersView({
             {t.sharedCharactersBack}
           </button>
 
-          <button
-            className="button secondary"
-            type="button"
-            onClick={refresh}
-            disabled={detailState === "loading"}
-          >
-            {detailState === "loading"
-              ? t.sharedCharactersLoading
-              : t.sharedCharactersRefresh}
-          </button>
+          {!selectedTerminalDetail && (
+            <button
+              className="button secondary"
+              type="button"
+              onClick={refresh}
+              disabled={detailState === "loading"}
+            >
+              {detailState === "loading"
+                ? t.sharedCharactersLoading
+                : t.sharedCharactersRefresh}
+            </button>
+          )}
         </div>
 
         {detailState === "loading" && (
@@ -221,8 +382,15 @@ export function SharedCharactersView({
         )}
 
         {detailState === "error" && (
-          <div className="shared-characters-state compact error" role="alert">
-            <h1 id="shared-detail-title">{t.sharedCharacterUnavailableTitle}</h1>
+          <div
+            className={`shared-characters-state compact error${
+              selectedTerminalDetail ? " terminal" : ""
+            }`}
+            role="alert"
+            aria-live="assertive"
+            data-terminal-reason={selectedTerminalDetail?.reason}
+          >
+            <h1 id="shared-detail-title">{detailErrorTitle}</h1>
             <p>{detailError}</p>
             <button className="button secondary" type="button" onClick={onBackToList}>
               {t.sharedCharactersBack}
@@ -234,9 +402,15 @@ export function SharedCharactersView({
           <>
             <div className="shared-character-summary">
               <div>
-                <span className="shared-character-eyebrow">
-                  {t.sharedCharacterReadOnlyLabel}
-                </span>
+                <div className="shared-character-status-row">
+                  <span className="shared-character-eyebrow">
+                    {t.sharedCharacterReadOnlyLabel}
+                  </span>
+                  <SharedCharacterConnectionStatus
+                    t={t}
+                    state={realtimeConnectionState}
+                  />
+                </div>
                 <h1 id="shared-detail-title">{selectedCharacter.name}</h1>
                 <p>
                   {t.sharedCharacterOwnerLabel}: {selectedCharacter.ownerDisplayName || t.sharedCharacterOwnerUnknown}

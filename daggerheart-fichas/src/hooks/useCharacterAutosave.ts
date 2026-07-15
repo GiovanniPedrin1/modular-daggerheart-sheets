@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  isReadonlyCharacter,
+  isCharacterEditLocked,
   saveCharacterSheetData,
   type CharacterRecord,
 } from "../services/characterService";
@@ -50,7 +50,7 @@ export function useCharacterAutosave({
   const selectedCharacterRef = useRef<CharacterRecord | undefined>(selectedCharacter);
   const selectedCharacterIdRef = useRef(selectedCharacter?.id ?? "");
   const autosaveDisabledRef = useRef(
-    readOnly || Boolean(selectedCharacter && isReadonlyCharacter(selectedCharacter))
+    readOnly || Boolean(selectedCharacter && isCharacterEditLocked(selectedCharacter))
   );
   const autosaveTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const activeEditingCharactersRef = useRef(new Set<string>());
@@ -74,7 +74,7 @@ export function useCharacterAutosave({
 
   useEffect(() => {
     const disabled =
-      readOnly || Boolean(selectedCharacter && isReadonlyCharacter(selectedCharacter));
+      readOnly || Boolean(selectedCharacter && isCharacterEditLocked(selectedCharacter));
 
     autosaveDisabledRef.current = disabled;
 
@@ -350,7 +350,7 @@ export function useCharacterAutosave({
     if (
       !currentCharacter ||
       autosaveDisabledRef.current ||
-      isReadonlyCharacter(currentCharacter)
+      isCharacterEditLocked(currentCharacter)
     ) {
       return;
     }

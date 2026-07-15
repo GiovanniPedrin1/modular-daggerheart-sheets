@@ -4,6 +4,7 @@ import "./App.css";
 import { AppTopbar } from "./components/app/AppTopbar";
 import { AuthModal } from "./components/app/AuthModal";
 import { CharacterCreateModal } from "./components/app/CharacterCreateModal";
+import { CharacterConflictResolutionModal } from "./components/app/CharacterConflictResolutionModal";
 import { CharacterDeleteModal } from "./components/app/CharacterDeleteModal";
 import { CharacterShareModal } from "./components/app/CharacterShareModal";
 import { ClearLocalDataModal } from "./components/app/ClearLocalDataModal";
@@ -15,12 +16,16 @@ import type { AuthMessage, AuthMode, SettingsMessage } from "./components/app/ap
 import { getAppVersionLabel } from "./config/appVersion";
 import { useCharacterAutosave } from "./hooks/useCharacterAutosave";
 import { useOnlineStatus } from "./hooks/useOnlineStatus";
+import { useCharacterSync } from "./hooks/useCharacterSync";
+import { useOwnerCharacterRealtimeSync } from "./hooks/useOwnerCharacterRealtimeSync";
 import { useCloudBackups } from "./hooks/useCloudBackups";
 import { appTexts, getSafeLanguage } from "./i18n/appTexts";
 import {
   createCharacter,
   deleteCharacter,
   getNextLocalEditSyncStatus,
+  isCharacterEditLocked,
+  isConflictLockedCharacter,
   isReadonlyCharacter,
   listActiveCharacters,
   type CharacterRecord,
@@ -39,6 +44,9 @@ import {
   activateCharacterSync,
   ActivateCharacterSyncError,
 } from "./services/cloudCharacterSyncService";
+import {
+  loadOwnerCloudCharactersOnDevice,
+} from "./services/ownerCloudCharacterAccessService";
 import {
   getCharacterRoutePath,
   getDecodedRouteParam,
@@ -118,6 +126,8 @@ export default function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isCharacterShareModalOpen, setIsCharacterShareModalOpen] =
     useState(false);
+  const [conflictResolutionCharacterId, setConflictResolutionCharacterId] =
+    useState("");
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
 
@@ -146,6 +156,24 @@ export default function App() {
   const cloudApiConfigured = isCloudApiConfigured();
   const appVersionLabel = getAppVersionLabel();
   const canUseCloud = isOnline && cloudApiConfigured;
+
+  useCharacterSync({
+    enabled: booted && canUseCloud && Boolean(currentUser),
+    ownerUserId: currentUser?.id,
+    onLocalCharactersChanged: async () => {
+      await refreshCharacters();
+    },
+  });
+
+  useOwnerCharacterRealtimeSync({
+    enabled: booted && canUseCloud && Boolean(currentUser),
+    ownerUserId: currentUser?.id,
+    characters,
+    onLocalCharactersChanged: async () => {
+      await refreshCharacters();
+    },
+  });
+
   const signedInLabel = currentUser?.displayName || currentUser?.email || "";
   const accountButtonLabel = currentUser
     ? signedInLabel
@@ -170,6 +198,18 @@ export default function App() {
   const selectedCharacterIsReadOnly = Boolean(
     selectedCharacter && isReadonlyCharacter(selectedCharacter)
   );
+  const selectedCharacterHasConflict = Boolean(
+    selectedCharacter && isConflictLockedCharacter(selectedCharacter)
+  );
+  const selectedCharacterEditingLocked = Boolean(
+    selectedCharacter && isCharacterEditLocked(selectedCharacter)
+  );
+  const conflictResolutionCharacter = useMemo(() => {
+    if (!conflictResolutionCharacterId) return undefined;
+    return characters.find(
+      (character) => character.id === conflictResolutionCharacterId
+    );
+  }, [characters, conflictResolutionCharacterId]);
 
   const {
     saveStatus,
@@ -181,7 +221,7 @@ export default function App() {
     resetSaveStatus,
   } = useCharacterAutosave({
     selectedCharacter,
-    readOnly: selectedCharacterIsReadOnly,
+    readOnly: selectedCharacterEditingLocked,
     onOptimisticCharacterChange: (characterId, change) => {
       setCharacters((current) =>
         current.map((character) =>
@@ -233,7 +273,7 @@ export default function App() {
 
   const canDeleteSelectedCharacter =
     Boolean(selectedCharacter) &&
-    !selectedCharacterIsReadOnly &&
+    !selectedCharacterEditingLocked &&
     deleteConfirmationName.trim() === selectedCharacter?.name;
 
   const canClearLocalData = clearConfirmation.trim() === t.clearDataToken;
@@ -373,6 +413,7 @@ export default function App() {
     }
 
     let cancelled = false;
+    const ownerCharactersController = new AbortController();
 
     async function loadCloudSession() {
       setIsCloudSessionLoading(true);
@@ -399,6 +440,32 @@ export default function App() {
           } catch (error) {
             console.warn("Não foi possível carregar backups da nuvem:", error);
           }
+
+          try {
+            const accessResult = await loadOwnerCloudCharactersOnDevice({
+              ownerUserId: user.id,
+              signal: ownerCharactersController.signal,
+            });
+
+            if (!cancelled && accessResult.importedCount > 0) {
+              const storedCharacters = await listActiveCharacters();
+              if (!cancelled) {
+                setCharacters(storedCharacters);
+              }
+            }
+          } catch (error) {
+            if (
+              error instanceof ApiClientError &&
+              error.code === "API_REQUEST_CANCELLED"
+            ) {
+              return;
+            }
+
+            console.warn(
+              "Não foi possível disponibilizar as fichas cloud do dono neste dispositivo:",
+              error
+            );
+          }
         } else {
           setCloudBackups([]);
         }
@@ -419,6 +486,7 @@ export default function App() {
 
     return () => {
       cancelled = true;
+      ownerCharactersController.abort();
     };
   }, [booted, cloudApiConfigured, isOnline, loadCloudBackups, setCloudBackups]);
 
@@ -451,6 +519,17 @@ export default function App() {
     routeCharacterId,
     selectedCharacterId,
   ]);
+
+  useEffect(() => {
+    if (!conflictResolutionCharacterId) return;
+
+    if (
+      !conflictResolutionCharacter ||
+      !isConflictLockedCharacter(conflictResolutionCharacter)
+    ) {
+      setConflictResolutionCharacterId("");
+    }
+  }, [conflictResolutionCharacter, conflictResolutionCharacterId]);
 
   useEffect(() => {
     if (!booted) return;
@@ -726,6 +805,30 @@ export default function App() {
       ]);
       await refreshCloudMetadata();
       await refreshCloudBackups({ skipPreconditions: true });
+
+      try {
+        const accessResult = await loadOwnerCloudCharactersOnDevice({
+          ownerUserId: response.user.id,
+        });
+
+        if (accessResult.importedCount > 0) {
+          await refreshCharacters();
+          setCloudCharacterMessage({
+            kind: "success",
+            text: t.ownerCloudCharactersImported(accessResult.importedCount),
+          });
+        }
+      } catch (error) {
+        console.warn(
+          "Não foi possível disponibilizar as fichas cloud do dono neste dispositivo:",
+          error
+        );
+        setCloudCharacterMessage({
+          kind: "error",
+          text: getErrorText(error, t.ownerCloudCharactersLoadError),
+        });
+      }
+
       setAuthPassword("");
       setAuthPasswordConfirmation("");
       setAuthMessage({ kind: "success", text: t.authSuccess });
@@ -1167,7 +1270,30 @@ export default function App() {
               key={`${selectedCharacter.id}-${language}`}
               character={selectedCharacter}
               language={language}
-              readOnly={selectedCharacterIsReadOnly}
+              readOnly={selectedCharacterEditingLocked}
+              readOnlyTitle={
+                selectedCharacterHasConflict
+                  ? t.cloudSyncConflictLockTitle
+                  : undefined
+              }
+              readOnlyDescription={
+                selectedCharacterHasConflict
+                  ? t.cloudSyncConflictLockDescription
+                  : undefined
+              }
+              readOnlyActionLabel={
+                selectedCharacterHasConflict
+                  ? t.cloudSyncConflictResolveButton
+                  : undefined
+              }
+              onReadOnlyAction={
+                selectedCharacterHasConflict
+                  ? () => {
+                      setCloudCharacterMessage(null);
+                      setConflictResolutionCharacterId(selectedCharacter.id);
+                    }
+                  : undefined
+              }
               saveStatusLabel={saveStatusLabel}
               saveStatusKind={saveStatus === "idle" ? undefined : saveStatus}
               onSheetDataChange={handleSheetDataChange}
@@ -1209,6 +1335,31 @@ export default function App() {
             canUseCloud={canUseCloud}
             language={language}
             onClose={() => setIsCharacterShareModalOpen(false)}
+          />
+        )}
+
+      {conflictResolutionCharacter &&
+        isConflictLockedCharacter(conflictResolutionCharacter) && (
+          <CharacterConflictResolutionModal
+            key={`${conflictResolutionCharacter.id}-${language}`}
+            t={t}
+            characterId={conflictResolutionCharacter.id}
+            ownerUserId={conflictResolutionCharacter.ownerUserId ?? ""}
+            language={language}
+            knownServerRevision={conflictResolutionCharacter.serverRevision}
+            onClose={() => setConflictResolutionCharacterId("")}
+            onResolved={async () => {
+              try {
+                await refreshCharacters();
+              } catch (error) {
+                console.error(
+                  "Erro ao atualizar fichas após resolver conflito:",
+                  error,
+                );
+              } finally {
+                setConflictResolutionCharacterId("");
+              }
+            }}
           />
         )}
 

@@ -1,0 +1,36 @@
+{
+  "validPaths": [
+    { "input": "/name", "canonical": "/name" },
+    { "input": "/classKey", "canonical": "/classKey" },
+    { "input": "/data/hp_current", "canonical": "/data/hp_current" },
+    { "input": "/data/detailsPage/story", "canonical": "/data/detailsPage/story" },
+    { "input": "/data/a~1b/c~0d", "canonical": "/data/a~1b/c~0d" },
+    { "input": "/data/space key", "canonical": "/data/space key" },
+    { "input": "/data/emoji-😀", "canonical": "/data/emoji-😀" }
+  ],
+  "invalidPaths": [
+    "data/hp_current",
+    "/data",
+    "/schemaVersion",
+    "/data/__proto__/polluted",
+    "/data/prototype/value",
+    "/data/constructor/value",
+    "/data/items/0",
+    "/data/items/-",
+    "/data/bad~2escape",
+    "/name/value",
+    "/data//story",
+    " /data/story",
+    "/data/story "
+  ],
+  "intersections": [
+    ["/name", "/name"],
+    ["/data/detailsPage", "/data/detailsPage/story"],
+    ["/data/a~1b", "/data/a~1b/child"]
+  ],
+  "nonIntersections": [
+    ["/data/hp", "/data/gold"],
+    ["/data/foo", "/data/foobar"],
+    ["/name", "/data/name"]
+  ]
+}

@@ -44,7 +44,7 @@ export class ApiClientError extends Error {
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 
-function getDefaultApiBaseUrl() {
+export function getCloudApiBaseUrl() {
   const value = import.meta.env.VITE_API_BASE_URL;
   return typeof value === "string" ? value.trim().replace(/\/+$/, "") : "";
 }
@@ -63,6 +63,14 @@ function buildUrl(baseUrl: string, path: string) {
 
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   return `${baseUrl}${normalizedPath}`;
+}
+
+
+export function buildCloudApiUrl(
+  path: string,
+  baseUrl = getCloudApiBaseUrl()
+) {
+  return buildUrl(baseUrl, path);
 }
 
 function parseRequestId(response: Response) {
@@ -141,7 +149,7 @@ export class ApiClient {
   private credentials: RequestCredentials;
 
   constructor(options: ApiClientOptions = {}) {
-    this.baseUrl = options.baseUrl ?? getDefaultApiBaseUrl();
+    this.baseUrl = options.baseUrl ?? getCloudApiBaseUrl();
     this.defaultTimeoutMs = options.defaultTimeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.credentials = options.credentials ?? "include";
   }

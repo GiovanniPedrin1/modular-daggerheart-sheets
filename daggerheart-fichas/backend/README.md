@@ -130,3 +130,29 @@ O frontend usa `credentials: include`, então mantenha `CORS_ALLOWED_ORIGINS` co
 - payload-size and supported-schema validation.
 
 The service calls `flush()` but leaves the normal transaction `commit()` to the HTTP endpoint. The only internal rollback occurs when recovering from a concurrent unique-index race during publication.
+
+## Character event retention
+
+Realtime character events are stored in PostgreSQL so SSE replay works across server restarts
+and multiple workers. The default policy keeps all events for 30 days and also preserves the
+latest 500 content revisions per character.
+
+Run the retention job from the `backend` directory:
+
+```bash
+prune-character-events
+# Equivalent when the package entrypoint is not installed:
+python -m app.commands.prune_character_events
+```
+
+The command emits a machine-readable JSON summary and commits only after a successful prune.
+It can be scheduled daily by the deployment platform. Configure the policy with:
+
+```env
+CHARACTER_EVENT_RETENTION_DAYS=30
+CHARACTER_EVENT_RETENTION_REVISIONS=500
+```
+
+When a viewer reconnects from a revision or cursor that is no longer replayable, the SSE
+endpoint sends `character.full_resync_required`. The client must fetch the current shared
+snapshot and reconnect from its `serverRevision`.

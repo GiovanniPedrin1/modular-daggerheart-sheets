@@ -15,6 +15,7 @@ from app.models.character_share import CharacterShare
 from app.models.cloud_character import CloudCharacter
 from app.models.user import User
 from app.schemas.shares import CreateCharacterShareRequest
+from app.services import character_event_service as event_service
 from app.services.cloud_character_service import get_owner_cloud_character
 from app.services.share_target_service import (
     ResolvedShareTarget,
@@ -225,7 +226,7 @@ async def revoke_character_share(
     share_id: UUID,
     revoked_at: datetime | None = None,
 ) -> RevokeCharacterShareResult:
-    await get_owner_cloud_character(
+    character = await get_owner_cloud_character(
         session,
         owner_user_id=owner_user_id,
         character_id=character_id,
@@ -252,7 +253,17 @@ async def revoke_character_share(
     share.status = "revoked"
     share.revoked_at = revocation_time
     session.add(share)
-    await session.flush()
+    if share.target_user_id is not None:
+        await event_service.append_share_revoked_event(
+            session,
+            character_id=character.id,
+            server_revision=character.server_revision,
+            audience_user_id=share.target_user_id,
+            revoked_at=revocation_time,
+            actor_user_id=owner_user_id,
+        )
+    else:
+        await session.flush()
 
     return RevokeCharacterShareResult(
         share_id=share.id,

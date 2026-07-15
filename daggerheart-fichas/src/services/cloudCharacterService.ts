@@ -1,5 +1,9 @@
 import { apiClient } from "./apiClient";
 import type {
+  CharacterMutationAppliedResponse,
+  CharacterMutationRequest,
+} from "../types/characterSync";
+import type {
   CreateCloudCharacterRequest,
   CreateCloudCharacterResponse,
   DeleteCloudCharacterResponse,
@@ -25,17 +29,24 @@ export async function createCloudCharacter(
   });
 }
 
-export async function listCloudCharacters() {
+export async function listCloudCharacters(
+  options: { signal?: AbortSignal } = {}
+) {
   return apiClient.request<ListCloudCharactersResponse>({
     method: "GET",
     path: CLOUD_CHARACTERS_PATH,
+    signal: options.signal,
   });
 }
 
-export async function getCloudCharacter(characterId: string) {
+export async function getCloudCharacter(
+  characterId: string,
+  options: { signal?: AbortSignal } = {}
+) {
   return apiClient.request<GetCloudCharacterResponse>({
     method: "GET",
     path: cloudCharacterPath(characterId),
+    signal: options.signal,
   });
 }
 
@@ -47,6 +58,19 @@ export async function updateCloudCharacter(
     method: "PATCH",
     path: cloudCharacterPath(characterId),
     body: request,
+  });
+}
+
+export async function applyCloudCharacterMutation(
+  characterId: string,
+  request: CharacterMutationRequest,
+  options: { signal?: AbortSignal } = {}
+) {
+  return apiClient.request<CharacterMutationAppliedResponse>({
+    method: "PATCH",
+    path: cloudCharacterPath(characterId),
+    body: request,
+    signal: options.signal,
   });
 }
 

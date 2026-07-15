@@ -12,6 +12,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 if TYPE_CHECKING:
+    from app.models.character_event import CharacterEvent
+    from app.models.character_mutation import CharacterMutation
     from app.models.character_share import CharacterShare
     from app.models.user import User
 
@@ -45,9 +47,7 @@ class CloudCharacter(Base):
             "owner_user_id",
             "local_character_id",
             unique=True,
-            postgresql_where=text(
-                "deleted_at IS NULL AND local_character_id IS NOT NULL"
-            ),
+            postgresql_where=text("deleted_at IS NULL AND local_character_id IS NOT NULL"),
         ),
         Index(
             "idx_cloud_characters_owner_updated_active",
@@ -105,6 +105,16 @@ class CloudCharacter(Base):
     )
 
     owner: Mapped[User] = relationship(back_populates="cloud_characters")
+    mutations: Mapped[list[CharacterMutation]] = relationship(
+        back_populates="character",
+        cascade="all, delete-orphan",
+        order_by="CharacterMutation.created_at",
+    )
+    events: Mapped[list[CharacterEvent]] = relationship(
+        back_populates="character",
+        cascade="all, delete-orphan",
+        order_by="CharacterEvent.id",
+    )
     shares: Mapped[list[CharacterShare]] = relationship(
         back_populates="character",
         cascade="all, delete-orphan",

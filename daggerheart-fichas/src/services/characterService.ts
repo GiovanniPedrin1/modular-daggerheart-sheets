@@ -1,8 +1,10 @@
 import {
   createCharacter as createLocalCharacter,
+  db,
   listCharacters as listLocalCharacters,
-  saveCharacterData,
   getNextLocalEditSyncStatus,
+  isCharacterEditLocked,
+  isConflictLockedCharacter,
   isReadonlyCharacter,
   softDeleteCharacter,
   type CharacterPermission,
@@ -12,6 +14,13 @@ import {
 } from "../db/localDb";
 import type { DaggerheartClassKey, Language } from "../sheets/daggerheart/types";
 import type { DaggerheartCharacterData } from "../sheets/daggerheart/utils/formData";
+import { buildAutosaveMutationDraft } from "./autosaveMutationService";
+import { CLOUD_CHARACTER_SCHEMA_VERSION } from "./cloudCharacterMapper";
+import { getOrCreateDeviceId } from "./settingsService";
+import {
+  buildSyncQueueRecord,
+  notifySyncQueueChanged,
+} from "./syncQueueService";
 
 export type {
   CharacterPermission,
@@ -20,7 +29,12 @@ export type {
   CharacterSystem,
 };
 
-export { getNextLocalEditSyncStatus, isReadonlyCharacter };
+export {
+  getNextLocalEditSyncStatus,
+  isCharacterEditLocked,
+  isConflictLockedCharacter,
+  isReadonlyCharacter,
+};
 
 export type CreateCharacterInput = {
   name: string;
@@ -37,12 +51,77 @@ export function createCharacter(input: CreateCharacterInput) {
   return createLocalCharacter(input);
 }
 
-export function saveCharacterSheetData(
+export async function saveCharacterSheetData(
   characterId: string,
   data: DaggerheartCharacterData,
   patch?: Partial<Pick<CharacterRecord, "name" | "language" | "class" | "system">>
 ) {
-  return saveCharacterData(characterId, data, patch);
+  const deviceId = await getOrCreateDeviceId();
+
+  const result = await db.transaction(
+    "rw",
+    db.characters,
+    db.syncQueue,
+    async () => {
+      const current = await db.characters.get(characterId);
+
+      if (!current) {
+        throw new Error("Character not found");
+      }
+
+      if (isCharacterEditLocked(current)) {
+        throw new Error(
+          isConflictLockedCharacter(current)
+            ? "CHARACTER_SYNC_CONFLICT"
+            : "READONLY_CHARACTER"
+        );
+      }
+
+      const mutationDraft = buildAutosaveMutationDraft({
+        previous: current,
+        nextData: data,
+        patch,
+      });
+      const now = new Date().toISOString();
+      const updated: CharacterRecord = {
+        ...current,
+        ...patch,
+        data,
+        updatedAt: now,
+        version: current.version + 1,
+        baseRevision: mutationDraft?.baseRevision ?? current.baseRevision,
+        syncStatus: getNextLocalEditSyncStatus(current),
+      };
+
+      await db.characters.put(updated);
+
+      if (mutationDraft && current.remoteId) {
+        await db.syncQueue.add(
+          buildSyncQueueRecord({
+            characterId: current.id,
+            remoteId: current.remoteId,
+            ownerUserId: current.ownerUserId,
+            deviceId,
+            baseRevision: mutationDraft.baseRevision,
+            schemaVersion: CLOUD_CHARACTER_SCHEMA_VERSION,
+            operations: mutationDraft.diff.operations,
+            changedPaths: mutationDraft.diff.changedPaths,
+            localVersion: updated.version,
+            createdAt: now,
+          })
+        );
+      }
+
+      return {
+        updated,
+        mutationQueued: Boolean(mutationDraft && current.remoteId),
+      };
+    }
+  );
+
+  if (result.mutationQueued) notifySyncQueueChanged();
+
+  return result.updated;
 }
 
 export function deleteCharacter(characterId: string) {

@@ -49,6 +49,10 @@ type DaggerheartSheetProps = {
   definition: DaggerheartClassDefinition;
   initialData?: DaggerheartCharacterData;
   readOnly?: boolean;
+  readOnlyTitle?: string;
+  readOnlyDescription?: string;
+  readOnlyActionLabel?: string;
+  onReadOnlyAction?: () => void;
   saveStatusLabel?: string;
   saveStatusKind?: "editing" | "saving" | "saved" | "error";
   onSheetDataChange?: (data: DaggerheartCharacterData) => void;
@@ -63,6 +67,10 @@ export function DaggerheartSheet({
   definition,
   initialData = {},
   readOnly = false,
+  readOnlyTitle,
+  readOnlyDescription,
+  readOnlyActionLabel,
+  onReadOnlyAction,
   saveStatusLabel,
   saveStatusKind,
   onSheetDataChange,
@@ -320,9 +328,20 @@ export function DaggerheartSheet({
       onBlur={readOnly ? undefined : handleBlur}
     >
       {readOnly ? (
-        <div className="dh-readonly-banner" role="status">
-          <strong>{t.readOnlyMode}</strong>
-          <span>{t.readOnlyDescription}</span>
+        <div className="dh-readonly-banner">
+          <div className="dh-readonly-banner-copy" role="status">
+            <strong>{readOnlyTitle ?? t.readOnlyMode}</strong>
+            <span>{readOnlyDescription ?? t.readOnlyDescription}</span>
+          </div>
+          {readOnlyActionLabel && onReadOnlyAction ? (
+            <button
+              className="dh-readonly-action"
+              type="button"
+              onClick={onReadOnlyAction}
+            >
+              {readOnlyActionLabel}
+            </button>
+          ) : null}
         </div>
       ) : saveStatusLabel ? (
         <div

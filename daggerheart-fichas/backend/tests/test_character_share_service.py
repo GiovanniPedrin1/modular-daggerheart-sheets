@@ -402,6 +402,12 @@ async def test_revoke_current_share_sets_tombstone_and_locks(monkeypatch) -> Non
     share = make_share(character_id=character_id, owner_user_id=owner_id)
     get_character = AsyncMock(return_value=make_character(owner_user_id=owner_id))
     monkeypatch.setattr(service, "get_owner_cloud_character", get_character)
+    append_event = AsyncMock()
+    monkeypatch.setattr(
+        service.event_service,
+        "append_share_revoked_event",
+        append_event,
+    )
     session = make_session()
     session.execute.return_value = scalar_result(share)
     revoked_at = datetime(2026, 7, 9, 15, 0, tzinfo=UTC)
@@ -428,7 +434,93 @@ async def test_revoke_current_share_sets_tombstone_and_locks(monkeypatch) -> Non
     statement = session.execute.await_args.args[0]
     assert statement._for_update_arg is not None
     session.add.assert_called_once_with(share)
+    append_event.assert_not_awaited()
     session.flush.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_revoke_active_share_emits_targeted_event_in_same_transaction(
+    monkeypatch,
+) -> None:
+    owner_id = uuid4()
+    viewer_id = uuid4()
+    character = make_character(owner_user_id=owner_id)
+    share = make_share(
+        character_id=character.id,
+        owner_user_id=owner_id,
+        target_user_id=viewer_id,
+        target_email="viewer@example.com",
+        status="active",
+    )
+    monkeypatch.setattr(
+        service,
+        "get_owner_cloud_character",
+        AsyncMock(return_value=character),
+    )
+    append_event = AsyncMock()
+    monkeypatch.setattr(
+        service.event_service,
+        "append_share_revoked_event",
+        append_event,
+    )
+    session = make_session()
+    session.execute.return_value = scalar_result(share)
+    revoked_at = datetime(2026, 7, 9, 15, 0, tzinfo=UTC)
+
+    result = await service.revoke_character_share(
+        session,
+        owner_user_id=owner_id,
+        character_id=character.id,
+        share_id=share.id,
+        revoked_at=revoked_at,
+    )
+
+    assert result.revoked_at == revoked_at
+    append_event.assert_awaited_once_with(
+        session,
+        character_id=character.id,
+        server_revision=character.server_revision,
+        audience_user_id=viewer_id,
+        revoked_at=revoked_at,
+        actor_user_id=owner_id,
+    )
+    session.flush.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_revoke_active_share_propagates_event_failure(monkeypatch) -> None:
+    owner_id = uuid4()
+    viewer_id = uuid4()
+    character = make_character(owner_user_id=owner_id)
+    share = make_share(
+        character_id=character.id,
+        owner_user_id=owner_id,
+        target_user_id=viewer_id,
+        status="active",
+    )
+    monkeypatch.setattr(
+        service,
+        "get_owner_cloud_character",
+        AsyncMock(return_value=character),
+    )
+    monkeypatch.setattr(
+        service.event_service,
+        "append_share_revoked_event",
+        AsyncMock(side_effect=RuntimeError("event insert failed")),
+    )
+    session = make_session()
+    session.execute.return_value = scalar_result(share)
+
+    with pytest.raises(RuntimeError, match="event insert failed"):
+        await service.revoke_character_share(
+            session,
+            owner_user_id=owner_id,
+            character_id=character.id,
+            share_id=share.id,
+        )
+
+    assert share.status == "revoked"
+    session.flush.assert_not_awaited()
 
 
 @pytest.mark.asyncio

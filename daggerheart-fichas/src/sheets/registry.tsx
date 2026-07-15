@@ -17,6 +17,10 @@ type SheetRendererProps = {
   character: Character;
   language: Language;
   readOnly?: boolean;
+  readOnlyTitle?: string;
+  readOnlyDescription?: string;
+  readOnlyActionLabel?: string;
+  onReadOnlyAction?: () => void;
   saveStatusLabel?: string;
   saveStatusKind?: "editing" | "saving" | "saved" | "error";
   onSheetDataChange?: (data: DaggerheartCharacterData) => void;
@@ -33,6 +37,10 @@ export function SheetRenderer({
   character,
   language,
   readOnly = false,
+  readOnlyTitle,
+  readOnlyDescription,
+  readOnlyActionLabel,
+  onReadOnlyAction,
   saveStatusLabel,
   saveStatusKind,
   onSheetDataChange,
@@ -59,6 +67,10 @@ export function SheetRenderer({
         definition={daggerheartClasses[character.class]}
         initialData={character.data}
         readOnly={readOnly}
+        readOnlyTitle={readOnlyTitle}
+        readOnlyDescription={readOnlyDescription}
+        readOnlyActionLabel={readOnlyActionLabel}
+        onReadOnlyAction={onReadOnlyAction}
         saveStatusLabel={readOnly ? undefined : saveStatusLabel}
         saveStatusKind={readOnly ? undefined : saveStatusKind}
         onSheetDataChange={readOnly ? undefined : onSheetDataChange}

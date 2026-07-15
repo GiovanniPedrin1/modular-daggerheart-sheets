@@ -51,4 +51,39 @@ describe("SheetRenderer readOnly", () => {
     await user.click(detailsTab);
     expect(detailsTab).toHaveAttribute("aria-current", "page");
   });
+
+  it("shows a conflict-specific lock message and action without unlocking controls", async () => {
+    const onReadOnlyAction = vi.fn();
+    const user = userEvent.setup();
+
+    const { container } = render(
+      <SheetRenderer
+        character={{
+          id: "owner-conflict-1",
+          name: "Lyra",
+          system: "daggerheart",
+          class: "sorcerer",
+          createdAt: "2026-07-15T12:00:00.000Z",
+          data: { char_name: "Lyra" },
+        }}
+        language="pt-BR"
+        readOnly
+        readOnlyTitle="Edição bloqueada por conflito"
+        readOnlyDescription="Resolva o conflito antes de continuar editando."
+        readOnlyActionLabel="Resolver conflito"
+        onReadOnlyAction={onReadOnlyAction}
+      />
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Edição bloqueada por conflito"
+    );
+
+    const action = screen.getByRole("button", { name: "Resolver conflito" });
+    await user.click(action);
+    expect(onReadOnlyAction).toHaveBeenCalledOnce();
+
+    const nameInput = container.querySelector<HTMLInputElement>("#char_name");
+    expect(nameInput).toBeDisabled();
+  });
 });

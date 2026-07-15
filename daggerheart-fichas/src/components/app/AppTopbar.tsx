@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import {
+  isCharacterEditLocked,
   isReadonlyCharacter,
   type CharacterRecord,
 } from "../../services/characterService";
@@ -63,6 +64,10 @@ export function AppTopbar({
   onLanguageChange,
   getCharacterClassLabel,
 }: AppTopbarProps) {
+  const selectedCharacterEditLocked = Boolean(
+    selectedCharacter && isCharacterEditLocked(selectedCharacter)
+  );
+
   return (
     <header className="topbar">
       <div className="topbar-left">
@@ -155,7 +160,12 @@ export function AppTopbar({
                 className="button secondary"
                 type="button"
                 onClick={onOpenDeleteModal}
-                disabled={isCharacterSyncActivating}
+                disabled={isCharacterSyncActivating || selectedCharacterEditLocked}
+                title={
+                  selectedCharacter?.syncStatus === "conflict"
+                    ? t.cloudSyncConflictDeleteHelp
+                    : undefined
+                }
               >
                 {t.deleteCharacter}
               </button>

@@ -1,0 +1,162 @@
+{
+  "cases": [
+    {
+      "name": "no changes",
+      "previous": {
+        "name": "Arden",
+        "system": "daggerheart",
+        "classKey": "guardian",
+        "language": "pt-BR",
+        "data": { "hp_current": "5" },
+        "schemaVersion": 1
+      },
+      "current": {
+        "name": "Arden",
+        "system": "daggerheart",
+        "classKey": "guardian",
+        "language": "pt-BR",
+        "data": { "hp_current": "5" },
+        "schemaVersion": 1
+      },
+      "changedPaths": [],
+      "operations": []
+    },
+    {
+      "name": "metadata and granular data changes",
+      "previous": {
+        "name": "Arden",
+        "system": "daggerheart",
+        "classKey": "guardian",
+        "language": "pt-BR",
+        "data": {
+          "detailsPage": { "story": "Before", "age": "20" },
+          "gold": 1,
+          "hp_current": "5"
+        },
+        "schemaVersion": 1
+      },
+      "current": {
+        "name": "Arden Vale",
+        "system": "daggerheart",
+        "classKey": "guardian",
+        "language": "pt-BR",
+        "data": {
+          "detailsPage": { "story": "After", "age": "20" },
+          "hp_current": "4",
+          "inventory": ["Rope", "Torch"]
+        },
+        "schemaVersion": 1
+      },
+      "changedPaths": [
+        "/name",
+        "/data/detailsPage/story",
+        "/data/gold",
+        "/data/hp_current",
+        "/data/inventory"
+      ],
+      "operations": [
+        { "op": "set", "path": "/name", "value": "Arden Vale" },
+        { "op": "set", "path": "/data/detailsPage/story", "value": "After" },
+        { "op": "remove", "path": "/data/gold" },
+        { "op": "set", "path": "/data/hp_current", "value": "4" },
+        { "op": "set", "path": "/data/inventory", "value": ["Rope", "Torch"] }
+      ]
+    },
+    {
+      "name": "arrays are atomic",
+      "previous": {
+        "name": "Lyra",
+        "system": "daggerheart",
+        "classKey": "wizard",
+        "language": "en-US",
+        "data": { "domains": ["Arcana"], "tags": ["a", "b"] },
+        "schemaVersion": 1
+      },
+      "current": {
+        "name": "Lyra",
+        "system": "daggerheart",
+        "classKey": "wizard",
+        "language": "en-US",
+        "data": { "domains": ["Arcana", "Codex"], "tags": ["a", "b"] },
+        "schemaVersion": 1
+      },
+      "changedPaths": ["/data/domains"],
+      "operations": [
+        { "op": "set", "path": "/data/domains", "value": ["Arcana", "Codex"] }
+      ]
+    },
+    {
+      "name": "new objects are set at their parent",
+      "previous": {
+        "name": "Nox",
+        "system": "custom",
+        "classKey": null,
+        "language": "pt-BR",
+        "data": {},
+        "schemaVersion": 1
+      },
+      "current": {
+        "name": "Nox",
+        "system": "custom",
+        "classKey": null,
+        "language": "pt-BR",
+        "data": { "notes": { "public": "Hello", "private": false } },
+        "schemaVersion": 1
+      },
+      "changedPaths": ["/data/notes"],
+      "operations": [
+        {
+          "op": "set",
+          "path": "/data/notes",
+          "value": { "public": "Hello", "private": false }
+        }
+      ]
+    },
+    {
+      "name": "escaped object keys",
+      "previous": {
+        "name": "Nox",
+        "system": "custom",
+        "classKey": null,
+        "language": "pt-BR",
+        "data": { "a/b": { "c~d": "before" } },
+        "schemaVersion": 1
+      },
+      "current": {
+        "name": "Nox",
+        "system": "custom",
+        "classKey": null,
+        "language": "pt-BR",
+        "data": { "a/b": { "c~d": "after" } },
+        "schemaVersion": 1
+      },
+      "changedPaths": ["/data/a~1b/c~0d"],
+      "operations": [
+        { "op": "set", "path": "/data/a~1b/c~0d", "value": "after" }
+      ]
+    },
+    {
+      "name": "nested removals preserve the parent object",
+      "previous": {
+        "name": "Nox",
+        "system": "custom",
+        "classKey": null,
+        "language": "pt-BR",
+        "data": { "details": { "story": "Old", "age": 25 } },
+        "schemaVersion": 1
+      },
+      "current": {
+        "name": "Nox",
+        "system": "custom",
+        "classKey": null,
+        "language": "pt-BR",
+        "data": { "details": { "age": 25 } },
+        "schemaVersion": 1
+      },
+      "changedPaths": ["/data/details/story"],
+      "operations": [
+        { "op": "remove", "path": "/data/details/story" }
+      ]
+    }
+  ]
+}

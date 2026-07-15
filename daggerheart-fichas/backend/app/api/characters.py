@@ -7,8 +7,19 @@ from fastapi import APIRouter, Response, status
 
 from app.api.dependencies import CurrentUser, DbSession, SettingsDep
 from app.api.errors import api_error
+from app.core.config import Settings
 from app.models.character_share import CharacterShare
 from app.models.cloud_character import CloudCharacter
+from app.schemas.character_sync import (
+    CharacterMutationAppliedResponse,
+    CharacterMutationRejectedDetail,
+    CharacterMutationRequest,
+    CharacterMutationTooLargeDetail,
+    CharacterRevisionNotAvailableDetail,
+    CharacterSyncClientAheadDetail,
+    CharacterSyncConflictDetail,
+    InvalidCharacterMutationDetail,
+)
 from app.schemas.characters import (
     CharacterTooLargeDetail,
     CloudCharacterListItem,
@@ -34,6 +45,8 @@ from app.schemas.shares import (
     ListCharacterSharesResponse,
     RevokeCharacterShareResponse,
 )
+from app.services import character_event_service as event_service
+from app.services import character_mutation_service as mutation_service
 from app.services import character_share_service as share_service
 from app.services import cloud_character_service as character_service
 from app.services import share_target_service
@@ -158,6 +171,121 @@ def raise_character_share_api_error(error: Exception) -> NoReturn:
         ) from error
 
     raise error
+
+
+def raise_character_mutation_service_error(
+    error: mutation_service.CharacterMutationServiceError,
+) -> NoReturn:
+    if isinstance(error, mutation_service.CharacterMutationIdempotencyKeyReuseError):
+        detail = CharacterMutationRejectedDetail(
+            mutationId=error.mutation.mutation_id,
+            rejectionCode="MUTATION_REJECTED",
+            reason=str(error),
+        )
+        raise api_error(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "MUTATION_REJECTED",
+            "The mutation idempotency key was reused with different content.",
+            detail.model_dump(by_alias=True, mode="json"),
+        ) from error
+
+    raise error
+
+
+def raise_character_mutation_result_api_error(
+    result: mutation_service.CharacterMutationConflictResult
+    | mutation_service.CharacterMutationRejectedResult,
+    *,
+    settings: Settings,
+) -> NoReturn:
+    if isinstance(result, mutation_service.CharacterMutationConflictResult):
+        detail = CharacterSyncConflictDetail.from_mutation(result.mutation)
+        raise api_error(
+            status.HTTP_409_CONFLICT,
+            "SYNC_CONFLICT",
+            "The local mutation conflicts with newer remote changes.",
+            detail.model_dump(by_alias=True, mode="json"),
+        )
+
+    code = result.code
+    if code == "SYNC_CLIENT_AHEAD":
+        detail = CharacterSyncClientAheadDetail(
+            characterId=result.character.id,
+            mutationId=result.mutation.mutation_id,
+            baseRevision=result.mutation.base_revision,
+            serverRevision=result.character.server_revision,
+        )
+        raise api_error(
+            status.HTTP_409_CONFLICT,
+            code,
+            "The mutation is based on a revision newer than the server.",
+            detail.model_dump(by_alias=True, mode="json"),
+        )
+
+    if code == "REVISION_NOT_AVAILABLE":
+        detail = CharacterRevisionNotAvailableDetail(
+            characterId=result.character.id,
+            mutationId=result.mutation.mutation_id,
+            baseRevision=result.mutation.base_revision,
+            serverRevision=result.character.server_revision,
+            oldestAvailableRevision=result.oldest_available_revision,
+        )
+        raise api_error(
+            status.HTTP_409_CONFLICT,
+            code,
+            "The server no longer has enough path history to merge this mutation safely.",
+            detail.model_dump(by_alias=True, mode="json"),
+        )
+
+    if code == "MUTATION_TOO_LARGE":
+        if result.max_bytes is not None and result.actual_bytes is not None:
+            detail = CharacterMutationTooLargeDetail(
+                maxBytes=result.max_bytes,
+                actualBytes=result.actual_bytes,
+            ).model_dump(by_alias=True, mode="json")
+        else:
+            detail = CharacterMutationRejectedDetail.from_mutation(
+                result.mutation
+            ).model_dump(by_alias=True, mode="json")
+        raise api_error(
+            status.HTTP_413_CONTENT_TOO_LARGE,
+            code,
+            "The character mutation is too large.",
+            detail,
+        )
+
+    if code == "UNSUPPORTED_CHARACTER_SCHEMA_VERSION":
+        detail = UnsupportedCharacterSchemaVersionDetail(
+            supportedVersion=settings.supported_cloud_character_schema_version,
+            receivedVersion=result.mutation.schema_version,
+        )
+        raise api_error(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            code,
+            "This character mutation schema version is not supported.",
+            detail.model_dump(by_alias=True, mode="json"),
+        )
+
+    if code == "INVALID_MUTATION":
+        detail = InvalidCharacterMutationDetail(
+            mutationId=result.mutation.mutation_id,
+            reason=result.reason,
+            path=result.path,
+        )
+        raise api_error(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            code,
+            "The character mutation is invalid.",
+            detail.model_dump(by_alias=True, mode="json"),
+        )
+
+    detail = CharacterMutationRejectedDetail.from_mutation(result.mutation)
+    raise api_error(
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        "MUTATION_REJECTED",
+        "The character mutation was rejected.",
+        detail.model_dump(by_alias=True, mode="json"),
+    )
 
 
 @router.post(
@@ -373,29 +501,78 @@ async def get_cloud_character(
 
 @router.patch(
     "/{character_id}",
-    response_model=UpdateCloudCharacterResponse,
+    response_model=UpdateCloudCharacterResponse | CharacterMutationAppliedResponse,
     responses={
         status.HTTP_404_NOT_FOUND: {
             "description": "The character is missing, deleted, or owned by another user."
         },
         status.HTTP_409_CONFLICT: {
-            "description": "The supplied base revision is not current."
+            "description": (
+                "The legacy snapshot revision is stale, the mutation conflicts, "
+                "the client is ahead, or safe merge history is unavailable."
+            )
         },
         status.HTTP_413_CONTENT_TOO_LARGE: {
-            "description": "The normalized snapshot exceeds the configured size limit."
+            "description": (
+                "The normalized snapshot, encoded mutation, or resulting character "
+                "exceeds the configured size limit."
+            )
         },
         status.HTTP_422_UNPROCESSABLE_CONTENT: {
-            "description": "The request or schema version is invalid."
+            "description": "The request, mutation, idempotency key, or schema is invalid."
         },
     },
 )
 async def update_cloud_character(
     character_id: UUID,
-    input_data: UpdateCloudCharacterRequest,
+    input_data: UpdateCloudCharacterRequest | CharacterMutationRequest,
     session: DbSession,
     settings: SettingsDep,
     current_user: CurrentUser,
-) -> UpdateCloudCharacterResponse:
+) -> UpdateCloudCharacterResponse | CharacterMutationAppliedResponse:
+    if isinstance(input_data, CharacterMutationRequest):
+        try:
+            mutation_result = await mutation_service.apply_owner_character_mutation(
+                session,
+                owner_user_id=current_user.id,
+                character_id=character_id,
+                input_data=input_data,
+                settings=settings,
+            )
+        except character_service.CloudCharacterServiceError as error:
+            raise_cloud_character_api_error(error)
+        except mutation_service.CharacterMutationServiceError as error:
+            raise_character_mutation_service_error(error)
+
+        if isinstance(
+            mutation_result,
+            mutation_service.CharacterMutationAppliedResult,
+        ):
+            if mutation_result.should_emit_updated_event:
+                await event_service.append_character_updated_event(
+                    session,
+                    character=mutation_result.character,
+                    actor_user_id=current_user.id,
+                    changed_paths=mutation_result.mutation.changed_paths,
+                    device_id=mutation_result.mutation.device_id,
+                )
+
+            await session.commit()
+            if mutation_result.should_emit_updated_event:
+                await session.refresh(mutation_result.character)
+
+            return CharacterMutationAppliedResponse.from_mutation(
+                mutation_result.mutation,
+                mutation_result.character,
+                duplicate=mutation_result.duplicate,
+            )
+
+        await session.commit()
+        raise_character_mutation_result_api_error(
+            mutation_result,
+            settings=settings,
+        )
+
     try:
         result = await character_service.update_cloud_character(
             session,

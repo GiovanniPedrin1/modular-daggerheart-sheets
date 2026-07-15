@@ -52,6 +52,85 @@ export const appTexts = {
     cloudSyncStatusConflict: "Conflito",
     cloudSyncStatusConflictHelp:
       "A ficha precisa de revisão antes de novas alterações serem enviadas.",
+    cloudSyncConflictLockTitle: "Edição bloqueada por conflito",
+    cloudSyncConflictLockDescription:
+      "As alterações locais foram preservadas. Resolva o conflito antes de continuar editando esta ficha.",
+    cloudSyncConflictResolveButton: "Resolver conflito",
+    cloudSyncConflictResolutionPending:
+      "O conflito está preservado com segurança. Abra a comparação para revisar as versões local e da nuvem.",
+    characterConflictTitle: "Resolver conflito de sincronização",
+    characterConflictDescription: (name: string) =>
+      name
+        ? `Compare as versões de “${name}” e escolha qual valor deve ser mantido em cada campo.`
+        : "Compare as versões local e da nuvem e escolha qual valor deve ser mantido.",
+    characterConflictLoading: "Carregando detalhes do conflito...",
+    characterConflictLoadError:
+      "Não foi possível carregar os detalhes deste conflito. Feche o modal e tente novamente.",
+    characterConflictServerRevision: "Revisão da nuvem",
+    characterConflictFieldsLabel: "Campos em conflito",
+    characterConflictComplexFieldsLabel: "Blocos complexos",
+    characterConflictNewerRevisionTitle: "A nuvem mudou novamente",
+    characterConflictNewerRevisionDescription:
+      "A nuvem recebeu novas alterações enquanto este conflito estava aberto. Atualize a comparação antes de continuar; escolhas compatíveis serão preservadas.",
+    characterConflictRefreshButton: "Atualizar comparação",
+    characterConflictRefreshing: "Atualizando comparação...",
+    characterConflictRefreshSuccess: (preserved: number, added: number) =>
+      `${preserved} escolha(s) preservada(s) e ${added} novo(s) campo(s) para revisar.`,
+    characterConflictRefreshUnchanged:
+      "A comparação já usa a revisão mais recente da nuvem.",
+    characterConflictRefreshError:
+      "Não foi possível atualizar a comparação. Verifique a conexão e tente novamente.",
+    characterConflictDraftStale:
+      "Existe um rascunho de escolhas para uma versão anterior deste conflito. Ele foi preservado, mas não será aplicado a esta comparação.",
+    characterConflictDraftUnsupported:
+      "O rascunho salvo usa a estratégia de duplicação, que será disponibilizada em uma etapa posterior. Escolha novamente para continuar.",
+    characterConflictStrategyTitle: "Como deseja escolher?",
+    characterConflictStrategyDescription:
+      "Você pode revisar campo a campo ou preencher todas as escolhas com uma das versões.",
+    characterConflictStrategyField: "Escolher campo a campo",
+    characterConflictStrategyLocal: "Usar tudo local",
+    characterConflictStrategyRemote: "Usar tudo da nuvem",
+    characterConflictStrategyDuplicate: "Duplicar versão local",
+    characterConflictDuplicateTitle: "Preservar uma cópia independente",
+    characterConflictDuplicateDescription:
+      "A versão deste dispositivo será criada como uma nova ficha local, sem vínculo com a nuvem. A ficha original voltará a mostrar a revisão atual da nuvem.",
+    characterConflictProgress: (chosen: number, total: number) =>
+      `${chosen} de ${total} campo(s) escolhidos`,
+    characterConflictDuplicateProgress:
+      "Nenhuma escolha por campo é necessária para criar a cópia local.",
+    characterConflictDraftAutosave:
+      "As escolhas são salvas automaticamente neste dispositivo.",
+    characterConflictDraftSaving: "Salvando escolhas...",
+    characterConflictDraftSaved: "Escolhas salvas neste dispositivo.",
+    characterConflictDraftSaveError:
+      "Não foi possível salvar as escolhas. Tente selecionar o campo novamente.",
+    characterConflictLocalVersion: "Versão deste dispositivo",
+    characterConflictCloudVersion: "Versão da nuvem",
+    characterConflictComplexLabel: "Bloco complexo",
+    characterConflictComplexStructuredHelp:
+      "Este valor contém uma estrutura completa. A escolha substitui o bloco inteiro.",
+    characterConflictComplexHierarchyHelp:
+      "A nuvem alterou um campo pai ou filho relacionado. A escolha é aplicada ao bloco para evitar uma combinação insegura.",
+    characterConflictApplyPending:
+      "As escolhas já podem ser revisadas e ficam salvas ao fechar.",
+    characterConflictChooseAll:
+      "Escolha uma versão para todos os campos antes de confirmar.",
+    characterConflictApplyReady:
+      "Ao confirmar, as mutações antigas serão encerradas e uma nova mutação de resolução será enviada com base na revisão atual da nuvem.",
+    characterConflictNoMutation:
+      "Estas escolhas mantêm integralmente a versão da nuvem. Ao confirmar, as alterações locais deste conflito serão descartadas com segurança e nenhuma mutação será enviada.",
+    characterConflictDuplicateReady:
+      "Ao confirmar, a versão local será preservada em uma nova ficha independente e a ficha cloud será restaurada para a revisão atual da nuvem. Nenhuma mutação será enviada.",
+    characterConflictConfirm: "Confirmar e sincronizar",
+    characterConflictDiscard: "Descartar alterações locais",
+    characterConflictDuplicateConfirm: "Duplicar e manter nuvem",
+    characterConflictSubmitting: "Preparando sincronização...",
+    characterConflictDiscarding: "Descartando alterações locais...",
+    characterConflictDuplicating: "Duplicando ficha...",
+    characterConflictSubmitError:
+      "Não foi possível preparar a resolução. O conflito e suas escolhas continuam preservados; tente novamente.",
+    cloudSyncConflictDeleteHelp:
+      "Resolva o conflito antes de excluir esta ficha.",
     cloudSyncStatusReadonly: "Somente leitura",
     cloudSyncStatusReadonlyHelp:
       "Esta ficha pode ser visualizada, mas não editada neste dispositivo.",
@@ -74,6 +153,12 @@ export const appTexts = {
     cloudSyncActivatedWithQueuedChanges:
       "Sync ativado. Alterações feitas durante o envio ficaram pendentes para a próxima sincronização.",
     cloudSyncActivateError: "Não foi possível ativar o sync desta ficha.",
+    ownerCloudCharactersImported: (count: number) =>
+      count === 1
+        ? "1 ficha da sua conta foi disponibilizada neste dispositivo."
+        : `${count} fichas da sua conta foram disponibilizadas neste dispositivo.`,
+    ownerCloudCharactersLoadError:
+      "Não foi possível carregar suas fichas cloud neste dispositivo.",
     characterShareButton: "Compartilhar",
     characterShareButtonHelp:
       "Gerencie quem pode visualizar a versão desta ficha salva na nuvem.",
@@ -150,7 +235,29 @@ export const appTexts = {
     sharedCharacterNotFound:
       "Esta ficha não está mais disponível ou o acesso foi revogado.",
     sharedCharacterUnavailableTitle: "Ficha indisponível",
+    sharedCharacterAccessRevokedTitle: "Acesso revogado",
+    sharedCharacterAccessRevoked:
+      "O proprietário revogou seu acesso. A ficha foi removida desta sessão.",
+    sharedCharacterDeletedTitle: "Ficha removida",
+    sharedCharacterDeleted:
+      "O proprietário removeu esta ficha. Ela não está mais disponível.",
     sharedCharacterReadOnlyLabel: "Modo leitura",
+    sharedCharacterRealtimeStatusLabel: "Conexão em tempo real",
+    sharedCharacterRealtimeConnecting: "Conectando...",
+    sharedCharacterRealtimeConnectingHelp:
+      "Estabelecendo a conexão para receber atualizações da ficha.",
+    sharedCharacterRealtimeLive: "Ao vivo",
+    sharedCharacterRealtimeLiveHelp:
+      "As alterações do proprietário aparecem automaticamente.",
+    sharedCharacterRealtimeReconnecting: "Reconectando...",
+    sharedCharacterRealtimeReconnectingHelp:
+      "A conexão foi interrompida e está sendo restabelecida.",
+    sharedCharacterRealtimeOffline: "Offline",
+    sharedCharacterRealtimeOfflineHelp:
+      "Sem conexão com a internet. A ficha será recarregada ao reconectar.",
+    sharedCharacterRealtimeClosed: "Tempo real indisponível",
+    sharedCharacterRealtimeClosedHelp:
+      "As atualizações automáticas estão indisponíveis. Use Atualizar para buscar o snapshot mais recente.",
     sharedCharacterOwnerLabel: "Compartilhada por",
     sharedCharacterOwnerUnknown: "Proprietário",
     sharedCharacterRevisionLabel: "Revisão",
@@ -382,6 +489,85 @@ export const appTexts = {
     cloudSyncStatusConflict: "Conflict",
     cloudSyncStatusConflictHelp:
       "The character needs review before more changes can be uploaded.",
+    cloudSyncConflictLockTitle: "Editing blocked by conflict",
+    cloudSyncConflictLockDescription:
+      "Your local changes were preserved. Resolve the conflict before editing this character again.",
+    cloudSyncConflictResolveButton: "Resolve conflict",
+    cloudSyncConflictResolutionPending:
+      "The conflict is safely preserved. Open the comparison to review the local and cloud versions.",
+    characterConflictTitle: "Resolve sync conflict",
+    characterConflictDescription: (name: string) =>
+      name
+        ? `Compare the versions of “${name}” and choose which value to keep for each field.`
+        : "Compare the local and cloud versions and choose which value to keep.",
+    characterConflictLoading: "Loading conflict details...",
+    characterConflictLoadError:
+      "Could not load this conflict. Close the dialog and try again.",
+    characterConflictServerRevision: "Cloud revision",
+    characterConflictFieldsLabel: "Conflicting fields",
+    characterConflictComplexFieldsLabel: "Complex blocks",
+    characterConflictNewerRevisionTitle: "The cloud changed again",
+    characterConflictNewerRevisionDescription:
+      "The cloud changed while this conflict was open. Refresh the comparison before continuing; compatible choices will be preserved.",
+    characterConflictRefreshButton: "Refresh comparison",
+    characterConflictRefreshing: "Refreshing comparison...",
+    characterConflictRefreshSuccess: (preserved: number, added: number) =>
+      `${preserved} choice(s) preserved and ${added} new field(s) to review.`,
+    characterConflictRefreshUnchanged:
+      "The comparison already uses the latest cloud revision.",
+    characterConflictRefreshError:
+      "The comparison could not be refreshed. Check your connection and try again.",
+    characterConflictDraftStale:
+      "There is a saved choice draft for an earlier version of this conflict. It was preserved, but it will not be applied to this comparison.",
+    characterConflictDraftUnsupported:
+      "The saved draft uses the duplicate strategy, which will be added in a later step. Choose again to continue.",
+    characterConflictStrategyTitle: "How do you want to choose?",
+    characterConflictStrategyDescription:
+      "Review each field or fill every choice with one version.",
+    characterConflictStrategyField: "Choose field by field",
+    characterConflictStrategyLocal: "Use all local",
+    characterConflictStrategyRemote: "Use all cloud",
+    characterConflictStrategyDuplicate: "Duplicate local version",
+    characterConflictDuplicateTitle: "Preserve an independent copy",
+    characterConflictDuplicateDescription:
+      "This device's version will become a new local-only character with no cloud link. The original character will return to the current cloud revision.",
+    characterConflictProgress: (chosen: number, total: number) =>
+      `${chosen} of ${total} field(s) chosen`,
+    characterConflictDuplicateProgress:
+      "No field-by-field choices are needed to create the local copy.",
+    characterConflictDraftAutosave:
+      "Choices are saved automatically on this device.",
+    characterConflictDraftSaving: "Saving choices...",
+    characterConflictDraftSaved: "Choices saved on this device.",
+    characterConflictDraftSaveError:
+      "Could not save the choices. Select the field again to retry.",
+    characterConflictLocalVersion: "This device's version",
+    characterConflictCloudVersion: "Cloud version",
+    characterConflictComplexLabel: "Complex block",
+    characterConflictComplexStructuredHelp:
+      "This value contains a complete structure. The choice replaces the entire block.",
+    characterConflictComplexHierarchyHelp:
+      "The cloud changed a related parent or child field. The choice applies to the block to avoid an unsafe combination.",
+    characterConflictApplyPending:
+      "You can review the choices now, and they remain saved after closing.",
+    characterConflictChooseAll:
+      "Choose a version for every field before confirming.",
+    characterConflictApplyReady:
+      "When you confirm, the old mutations will be closed and a new resolution mutation will be queued from the current cloud revision.",
+    characterConflictNoMutation:
+      "These choices keep the cloud version in full. When you confirm, the local changes in this conflict will be safely discarded and no mutation will be sent.",
+    characterConflictDuplicateReady:
+      "When you confirm, the local version will be preserved as a new independent character and the cloud character will be restored to the current cloud revision. No mutation will be sent.",
+    characterConflictConfirm: "Confirm and sync",
+    characterConflictDiscard: "Discard local changes",
+    characterConflictDuplicateConfirm: "Duplicate and keep cloud",
+    characterConflictSubmitting: "Preparing sync...",
+    characterConflictDiscarding: "Discarding local changes...",
+    characterConflictDuplicating: "Duplicating character...",
+    characterConflictSubmitError:
+      "Could not prepare the resolution. The conflict and your choices remain preserved; try again.",
+    cloudSyncConflictDeleteHelp:
+      "Resolve the conflict before deleting this character.",
     cloudSyncStatusReadonly: "Read only",
     cloudSyncStatusReadonlyHelp:
       "This character can be viewed but not edited on this device.",
@@ -404,6 +590,12 @@ export const appTexts = {
     cloudSyncActivatedWithQueuedChanges:
       "Sync enabled. Changes made during upload are queued for the next synchronization.",
     cloudSyncActivateError: "Could not enable sync for this character.",
+    ownerCloudCharactersImported: (count: number) =>
+      count === 1
+        ? "1 character from your account is now available on this device."
+        : `${count} characters from your account are now available on this device.`,
+    ownerCloudCharactersLoadError:
+      "Could not load your cloud characters on this device.",
     characterShareButton: "Share",
     characterShareButtonHelp:
       "Manage who can view the cloud version of this character.",
@@ -480,7 +672,29 @@ export const appTexts = {
     sharedCharacterNotFound:
       "This character is no longer available or access was revoked.",
     sharedCharacterUnavailableTitle: "Character unavailable",
+    sharedCharacterAccessRevokedTitle: "Access revoked",
+    sharedCharacterAccessRevoked:
+      "The owner revoked your access. The character was removed from this session.",
+    sharedCharacterDeletedTitle: "Character removed",
+    sharedCharacterDeleted:
+      "The owner removed this character. It is no longer available.",
     sharedCharacterReadOnlyLabel: "Read-only mode",
+    sharedCharacterRealtimeStatusLabel: "Realtime connection",
+    sharedCharacterRealtimeConnecting: "Connecting...",
+    sharedCharacterRealtimeConnectingHelp:
+      "Establishing the connection for character updates.",
+    sharedCharacterRealtimeLive: "Live",
+    sharedCharacterRealtimeLiveHelp:
+      "The owner's changes appear automatically.",
+    sharedCharacterRealtimeReconnecting: "Reconnecting...",
+    sharedCharacterRealtimeReconnectingHelp:
+      "The connection was interrupted and is being restored.",
+    sharedCharacterRealtimeOffline: "Offline",
+    sharedCharacterRealtimeOfflineHelp:
+      "There is no internet connection. The character will reload after reconnecting.",
+    sharedCharacterRealtimeClosed: "Realtime unavailable",
+    sharedCharacterRealtimeClosedHelp:
+      "Automatic updates are unavailable. Use Refresh to fetch the latest snapshot.",
     sharedCharacterOwnerLabel: "Shared by",
     sharedCharacterOwnerUnknown: "Owner",
     sharedCharacterRevisionLabel: "Revision",

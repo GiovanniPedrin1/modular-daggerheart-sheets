@@ -299,6 +299,12 @@ async def test_update_does_not_increment_identical_snapshot(monkeypatch) -> None
         "get_owner_cloud_character",
         AsyncMock(return_value=character),
     )
+    append_event = AsyncMock()
+    monkeypatch.setattr(
+        service.event_service,
+        "append_character_updated_event",
+        append_event,
+    )
     session = make_session()
 
     result = await service.update_cloud_character(
@@ -311,6 +317,7 @@ async def test_update_does_not_increment_identical_snapshot(monkeypatch) -> None
 
     assert result.unchanged is True
     assert character.server_revision == 1
+    append_event.assert_not_awaited()
     session.flush.assert_not_awaited()
 
 
@@ -321,6 +328,12 @@ async def test_update_replaces_snapshot_and_increments_revision(monkeypatch) -> 
         service,
         "get_owner_cloud_character",
         AsyncMock(return_value=character),
+    )
+    append_event = AsyncMock()
+    monkeypatch.setattr(
+        service.event_service,
+        "append_character_updated_event",
+        append_event,
     )
     session = make_session()
     input_data = make_update_request(name="Lyra Updated")
@@ -338,7 +351,54 @@ async def test_update_replaces_snapshot_and_increments_revision(monkeypatch) -> 
     assert character.data == input_data.data
     assert character.server_revision == 2
     assert character.updated_by_device_id == "device-2"
-    session.flush.assert_awaited_once()
+    append_event.assert_awaited_once_with(
+        session,
+        character=character,
+        actor_user_id=character.owner_user_id,
+        changed_paths=("/name", "/data/hp_current"),
+        device_id="device-2",
+    )
+    session.flush.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_update_uses_history_barrier_when_snapshot_diff_exceeds_path_limit(
+    monkeypatch,
+) -> None:
+    character = make_character(content_hash="b" * 64)
+    monkeypatch.setattr(
+        service,
+        "get_owner_cloud_character",
+        AsyncMock(return_value=character),
+    )
+    append_event = AsyncMock()
+    monkeypatch.setattr(
+        service.event_service,
+        "append_character_updated_event",
+        append_event,
+    )
+    input_data = make_update_request(
+        data={f"field_{index}": index for index in range(129)}
+    )
+
+    session = make_session()
+    result = await service.update_cloud_character(
+        session,
+        owner_user_id=character.owner_user_id,
+        character_id=character.id,
+        input_data=input_data,
+        settings=Settings(app_env="test"),
+    )
+
+    assert result.unchanged is False
+    assert character.server_revision == 2
+    append_event.assert_awaited_once_with(
+        session,
+        character=character,
+        actor_user_id=character.owner_user_id,
+        changed_paths=None,
+        device_id="device-2",
+    )
 
 
 @pytest.mark.asyncio
@@ -346,6 +406,12 @@ async def test_soft_delete_sets_tombstone_and_flushes(monkeypatch) -> None:
     character = make_character()
     get_character = AsyncMock(return_value=character)
     monkeypatch.setattr(service, "get_owner_cloud_character", get_character)
+    append_event = AsyncMock()
+    monkeypatch.setattr(
+        service.event_service,
+        "append_character_deleted_event",
+        append_event,
+    )
     session = make_session()
 
     result = await service.soft_delete_cloud_character(
@@ -357,10 +423,73 @@ async def test_soft_delete_sets_tombstone_and_flushes(monkeypatch) -> None:
     assert result.character_id == character.id
     assert result.deleted_at == character.deleted_at
     assert character.updated_at == character.deleted_at
+    assert character.server_revision == 2
     get_character.assert_awaited_once_with(
         session,
         owner_user_id=character.owner_user_id,
         character_id=character.id,
         for_update=True,
     )
-    session.flush.assert_awaited_once()
+    append_event.assert_awaited_once_with(
+        session,
+        character=character,
+        actor_user_id=character.owner_user_id,
+    )
+    session.flush.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_update_propagates_event_failure_before_commit(monkeypatch) -> None:
+    character = make_character(content_hash="b" * 64)
+    monkeypatch.setattr(
+        service,
+        "get_owner_cloud_character",
+        AsyncMock(return_value=character),
+    )
+    append_event = AsyncMock(side_effect=RuntimeError("event insert failed"))
+    monkeypatch.setattr(
+        service.event_service,
+        "append_character_updated_event",
+        append_event,
+    )
+    session = make_session()
+
+    with pytest.raises(RuntimeError, match="event insert failed"):
+        await service.update_cloud_character(
+            session,
+            owner_user_id=character.owner_user_id,
+            character_id=character.id,
+            input_data=make_update_request(name="Changed"),
+            settings=Settings(app_env="test"),
+        )
+
+    assert character.server_revision == 2
+    append_event.assert_awaited_once()
+    session.flush.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_delete_propagates_event_failure_before_commit(monkeypatch) -> None:
+    character = make_character()
+    monkeypatch.setattr(
+        service,
+        "get_owner_cloud_character",
+        AsyncMock(return_value=character),
+    )
+    append_event = AsyncMock(side_effect=RuntimeError("event insert failed"))
+    monkeypatch.setattr(
+        service.event_service,
+        "append_character_deleted_event",
+        append_event,
+    )
+
+    with pytest.raises(RuntimeError, match="event insert failed"):
+        await service.soft_delete_cloud_character(
+            make_session(),
+            owner_user_id=character.owner_user_id,
+            character_id=character.id,
+        )
+
+    assert character.deleted_at is not None
+    assert character.server_revision == 2
+    append_event.assert_awaited_once()

@@ -1,5 +1,3 @@
-name: daggerheart-dev
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -9,7 +7,7 @@ services:
       POSTGRES_USER: daggerheart
       POSTGRES_PASSWORD: daggerheart
     ports:
-      - " 127.0.0.1:5433:5432"
+      - "5432:5432"
     volumes:
       - daggerheart_postgres_data:/var/lib/postgresql/data
     healthcheck:

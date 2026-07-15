@@ -15,6 +15,9 @@ dependencies = [
   "alembic>=1.14.0,<2.0.0",
 ]
 
+[project.scripts]
+prune-character-events = "app.commands.prune_character_events:main"
+
 [project.optional-dependencies]
 dev = [
   "httpx>=0.28.0,<1.0.0",

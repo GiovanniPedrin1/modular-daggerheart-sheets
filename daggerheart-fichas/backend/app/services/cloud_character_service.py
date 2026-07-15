@@ -18,6 +18,11 @@ from app.schemas.characters import (
     CreateCloudCharacterRequest,
     UpdateCloudCharacterRequest,
 )
+from app.services import character_event_service as event_service
+from app.services.character_patch_service import (
+    CharacterPatchError,
+    create_character_mutation_diff,
+)
 from app.services.cloud_character_hash import serialize_cloud_character_snapshot
 
 type CreateCloudCharacterReason = Literal["existing_identical_snapshot"]
@@ -264,6 +269,28 @@ async def update_cloud_character(
     if character.content_hash == validated.content_hash:
         return UpdateCloudCharacterResult(character=character, unchanged=True)
 
+    previous_snapshot = CloudCharacterSnapshotInput.model_validate(
+        {
+            "name": character.name,
+            "system": character.system,
+            "classKey": character.class_key,
+            "language": character.language,
+            "data": character.data,
+            "schemaVersion": character.schema_version,
+        }
+    )
+    try:
+        diff = create_character_mutation_diff(previous_snapshot, input_data)
+    except CharacterPatchError:
+        # The temporary full-snapshot PATCH may represent a schema migration or more
+        # than the mutation path limit. Preserve compatibility by writing a safe
+        # history barrier instead of failing or inventing incomplete path metadata.
+        changed_paths: tuple[str, ...] | None = None
+    else:
+        if diff.is_empty:
+            return UpdateCloudCharacterResult(character=character, unchanged=True)
+        changed_paths = diff.changed_paths
+
     character.name = input_data.name
     character.system = input_data.system
     character.class_key = input_data.class_key
@@ -275,7 +302,13 @@ async def update_cloud_character(
     character.updated_by_device_id = input_data.device_id
     character.updated_at = datetime.now(UTC)
 
-    await session.flush()
+    await event_service.append_character_updated_event(
+        session,
+        character=character,
+        actor_user_id=owner_user_id,
+        changed_paths=changed_paths,
+        device_id=input_data.device_id,
+    )
     return UpdateCloudCharacterResult(character=character, unchanged=False)
 
 
@@ -292,9 +325,14 @@ async def soft_delete_cloud_character(
         for_update=True,
     )
     deleted_at = datetime.now(UTC)
+    character.server_revision += 1
     character.deleted_at = deleted_at
     character.updated_at = deleted_at
-    await session.flush()
+    await event_service.append_character_deleted_event(
+        session,
+        character=character,
+        actor_user_id=owner_user_id,
+    )
 
     return DeleteCloudCharacterResult(
         character_id=character.id,
