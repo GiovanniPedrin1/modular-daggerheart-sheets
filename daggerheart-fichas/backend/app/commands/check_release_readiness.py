@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -85,9 +86,43 @@ def configuration_checks(settings: Settings) -> list[ReadinessCheck]:
     return checks
 
 
+def resolve_alembic_config_path(
+    *,
+    working_directory: Path | None = None,
+    module_file: Path | None = None,
+) -> Path:
+    explicit_path = os.environ.get("ALEMBIC_CONFIG", "").strip()
+    if explicit_path:
+        candidate = Path(explicit_path).expanduser()
+        if not candidate.is_absolute():
+            candidate = (working_directory or Path.cwd()) / candidate
+        candidate = candidate.resolve()
+        if candidate.is_file():
+            return candidate
+        raise FileNotFoundError(
+            "ALEMBIC_CONFIG points to a file that does not exist: "
+            f"{candidate}"
+        )
+
+    cwd = (working_directory or Path.cwd()).resolve()
+    source_file = (module_file or Path(__file__)).resolve()
+    candidates = (
+        cwd / "alembic.ini",
+        cwd / "backend" / "alembic.ini",
+        source_file.parents[2] / "alembic.ini",
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate.resolve()
+
+    raise FileNotFoundError(
+        "Could not locate alembic.ini. Run the command from the backend or "
+        "repository root, or set ALEMBIC_CONFIG to its absolute path."
+    )
+
+
 def expected_alembic_heads() -> tuple[str, ...]:
-    backend_root = Path(__file__).resolve().parents[2]
-    config = AlembicConfig(str(backend_root / "alembic.ini"))
+    config = AlembicConfig(str(resolve_alembic_config_path()))
     script = ScriptDirectory.from_config(config)
     return tuple(sorted(script.get_heads()))
 
