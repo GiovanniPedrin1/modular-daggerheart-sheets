@@ -145,41 +145,59 @@ export async function importLocalData(
 ): Promise<ImportResult> {
   const backup = parseBackupFile(data);
 
-  await db.transaction("rw", db.characters, db.syncQueue, db.settings, async () => {
-    const preservedCloudSettings =
-      options.mode === "replace"
-        ? (
-            await db.settings.bulkGet(
-              Object.values(CLOUD_METADATA_SETTING_KEYS)
-            )
-          ).filter((setting): setting is SettingRecord => Boolean(setting))
-        : [];
+  await db.transaction(
+    "rw",
+    db.characters,
+    db.syncQueue,
+    db.conflictResolutionDrafts,
+    db.settings,
+    async () => {
+      const preservedCloudSettings =
+        options.mode === "replace"
+          ? (
+              await db.settings.bulkGet(
+                Object.values(CLOUD_METADATA_SETTING_KEYS)
+              )
+            ).filter((setting): setting is SettingRecord => Boolean(setting))
+          : [];
 
-    if (options.mode === "replace") {
-      await Promise.all([
-        db.characters.clear(),
-        db.syncQueue.clear(),
-        db.settings.clear(),
-      ]);
-    } else if (backup.characters.length > 0) {
-      await db.syncQueue
-        .where("characterId")
-        .anyOf(backup.characters.map((character) => character.id))
-        .delete();
-    }
+      if (options.mode === "replace") {
+        await Promise.all([
+          db.characters.clear(),
+          db.syncQueue.clear(),
+          db.conflictResolutionDrafts.clear(),
+          db.settings.clear(),
+        ]);
+      } else if (backup.characters.length > 0) {
+        const importedCharacterIds = backup.characters.map(
+          (character) => character.id
+        );
 
-    if (backup.characters.length > 0) {
-      await db.characters.bulkPut(backup.characters);
-    }
+        await Promise.all([
+          db.syncQueue
+            .where("characterId")
+            .anyOf(importedCharacterIds)
+            .delete(),
+          db.conflictResolutionDrafts
+            .where("characterId")
+            .anyOf(importedCharacterIds)
+            .delete(),
+        ]);
+      }
 
-    if (backup.settings.length > 0) {
-      await db.settings.bulkPut(backup.settings);
-    }
+      if (backup.characters.length > 0) {
+        await db.characters.bulkPut(backup.characters);
+      }
 
-    if (preservedCloudSettings.length > 0) {
-      await db.settings.bulkPut(preservedCloudSettings);
+      if (backup.settings.length > 0) {
+        await db.settings.bulkPut(backup.settings);
+      }
+
+      if (preservedCloudSettings.length > 0) {
+        await db.settings.bulkPut(preservedCloudSettings);
+      }
     }
-  });
+  );
 
   return {
     characters: backup.characters.length,
@@ -188,13 +206,21 @@ export async function importLocalData(
 }
 
 export async function clearLocalData() {
-  await db.transaction("rw", db.characters, db.syncQueue, db.settings, async () => {
-    await Promise.all([
-      db.characters.clear(),
-      db.syncQueue.clear(),
-      db.settings.clear(),
-    ]);
-  });
+  await db.transaction(
+    "rw",
+    db.characters,
+    db.syncQueue,
+    db.conflictResolutionDrafts,
+    db.settings,
+    async () => {
+      await Promise.all([
+        db.characters.clear(),
+        db.syncQueue.clear(),
+        db.conflictResolutionDrafts.clear(),
+        db.settings.clear(),
+      ]);
+    }
+  );
 }
 
 export function downloadJson(filename: string, data: unknown) {

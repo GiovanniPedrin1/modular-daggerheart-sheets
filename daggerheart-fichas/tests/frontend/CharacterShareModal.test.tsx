@@ -95,7 +95,7 @@ describe("CharacterShareModal", () => {
       );
     });
     expect(
-      await screen.findByText(/A resposta não informa se o e-mail já possui conta/)
+      await screen.findByText(/Por privacidade, não informamos se o e-mail já possui conta/)
     ).toBeInTheDocument();
     expect(screen.getByText("new@example.com")).toBeInTheDocument();
 

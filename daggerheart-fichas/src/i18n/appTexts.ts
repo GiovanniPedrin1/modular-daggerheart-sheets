@@ -13,10 +13,7 @@ export const appTexts = {
     offlineStatus: "Offline",
     offlineBannerTitle: "Você está offline",
     offlineBannerDescription:
-      "O app continua funcionando. Suas alterações seguem sendo salvas neste dispositivo.",
-    loginTitle: "Conta",
-    loginDescription:
-      "Entre na sua conta para usar backup manual na nuvem. O app continua funcionando localmente sem login.",
+      "O app continua funcionando. As alterações ficam salvas neste dispositivo e, nas fichas com sync ativo, entram na fila para envio ao reconectar.",
     profileName: "Nome do perfil",
     saveLogin: "Salvar perfil local",
     cancel: "Cancelar",
@@ -35,7 +32,6 @@ export const appTexts = {
     saveError: "Erro ao salvar localmente",
     cloudSyncActivate: "Ativar sync",
     cloudSyncActivating: "Ativando sync...",
-    cloudSyncActive: "Sync ativo",
     cloudSyncStatusLabel: "Status da sincronização",
     cloudSyncStatusLocal: "Somente local",
     cloudSyncStatusLocalHelp:
@@ -45,19 +41,17 @@ export const appTexts = {
       "A ficha está sendo publicada e vinculada à nuvem.",
     cloudSyncStatusSynced: "Sincronizada",
     cloudSyncStatusSyncedHelp:
-      "O snapshot local corresponde à última revisão salva na nuvem.",
+      "Este dispositivo está alinhado com a revisão exibida da ficha na nuvem.",
     cloudSyncStatusQueued: "Alterações pendentes",
     cloudSyncStatusQueuedHelp:
-      "Há alterações locais posteriores ao último snapshot salvo na nuvem.",
+      "As alterações locais estão salvas e aguardam envio para a nuvem.",
     cloudSyncStatusConflict: "Conflito",
     cloudSyncStatusConflictHelp:
-      "A ficha precisa de revisão antes de novas alterações serem enviadas.",
+      "Há alterações concorrentes nos mesmos campos. Resolva o conflito para retomar a sincronização.",
     cloudSyncConflictLockTitle: "Edição bloqueada por conflito",
     cloudSyncConflictLockDescription:
       "As alterações locais foram preservadas. Resolva o conflito antes de continuar editando esta ficha.",
     cloudSyncConflictResolveButton: "Resolver conflito",
-    cloudSyncConflictResolutionPending:
-      "O conflito está preservado com segurança. Abra a comparação para revisar as versões local e da nuvem.",
     characterConflictTitle: "Resolver conflito de sincronização",
     characterConflictDescription: (name: string) =>
       name
@@ -82,8 +76,6 @@ export const appTexts = {
       "Não foi possível atualizar a comparação. Verifique a conexão e tente novamente.",
     characterConflictDraftStale:
       "Existe um rascunho de escolhas para uma versão anterior deste conflito. Ele foi preservado, mas não será aplicado a esta comparação.",
-    characterConflictDraftUnsupported:
-      "O rascunho salvo usa a estratégia de duplicação, que será disponibilizada em uma etapa posterior. Escolha novamente para continuar.",
     characterConflictStrategyTitle: "Como deseja escolher?",
     characterConflictStrategyDescription:
       "Você pode revisar campo a campo ou preencher todas as escolhas com uma das versões.",
@@ -111,8 +103,6 @@ export const appTexts = {
       "Este valor contém uma estrutura completa. A escolha substitui o bloco inteiro.",
     characterConflictComplexHierarchyHelp:
       "A nuvem alterou um campo pai ou filho relacionado. A escolha é aplicada ao bloco para evitar uma combinação insegura.",
-    characterConflictApplyPending:
-      "As escolhas já podem ser revisadas e ficam salvas ao fechar.",
     characterConflictChooseAll:
       "Escolha uma versão para todos os campos antes de confirmar.",
     characterConflictApplyReady:
@@ -130,15 +120,15 @@ export const appTexts = {
     characterConflictSubmitError:
       "Não foi possível preparar a resolução. O conflito e suas escolhas continuam preservados; tente novamente.",
     cloudSyncConflictDeleteHelp:
-      "Resolva o conflito antes de excluir esta ficha.",
+      "Resolva o conflito antes de remover esta ficha deste dispositivo.",
     cloudSyncStatusReadonly: "Somente leitura",
     cloudSyncStatusReadonlyHelp:
       "Esta ficha pode ser visualizada, mas não editada neste dispositivo.",
     cloudSyncStatusRevision: (revision: number) => `rev. ${revision}`,
     cloudSyncActivateHelp:
-      "Publica esta ficha na sua conta e vincula este dispositivo à versão na nuvem.",
+      "Publica esta ficha na sua conta, habilita a sincronização automática e permite acesso em outros dispositivos e compartilhamento em modo leitura.",
     cloudSyncActiveHelp:
-      "Esta ficha já está vinculada a uma versão viva na nuvem.",
+      "Esta ficha está vinculada à nuvem. Alterações locais são enfileiradas e sincronizadas automaticamente quando há conexão.",
     cloudSyncOfflineHelp: "Conecte-se à internet para ativar o sync desta ficha.",
     cloudSyncLoginRequiredHelp:
       "Entre na sua conta para ativar o sync desta ficha.",
@@ -161,7 +151,7 @@ export const appTexts = {
       "Não foi possível carregar suas fichas cloud neste dispositivo.",
     characterShareButton: "Compartilhar",
     characterShareButtonHelp:
-      "Gerencie quem pode visualizar a versão desta ficha salva na nuvem.",
+      "Gerencie quem pode visualizar esta ficha em modo leitura e receber suas atualizações.",
     characterShareOfflineHelp:
       "Conecte-se à internet para gerenciar o compartilhamento desta ficha.",
     characterShareLoginRequiredHelp:
@@ -185,7 +175,7 @@ export const appTexts = {
     characterShareSending: "Compartilhando...",
     characterShareCurrentTitle: "Acessos atuais",
     characterShareCurrentDescription:
-      "Essas pessoas podem abrir o último snapshot disponível na nuvem.",
+      "Essas pessoas podem abrir a ficha em modo leitura. Enquanto conectadas, recebem as atualizações automaticamente.",
     characterShareLoading: "Carregando acessos...",
     characterShareEmpty: "Esta ficha ainda não foi compartilhada.",
     characterShareEmailTarget: "E-mail",
@@ -194,7 +184,7 @@ export const appTexts = {
     characterShareRevoke: "Revogar",
     characterShareRevoking: "Revogando...",
     characterShareCreated:
-      "Compartilhamento criado. A resposta não informa se o e-mail já possui conta.",
+      "Compartilhamento criado. Por privacidade, não informamos se o e-mail já possui conta.",
     characterShareAlreadyExists:
       "Essa pessoa já possui um compartilhamento atual desta ficha.",
     characterShareRevoked: "Acesso revogado.",
@@ -257,24 +247,24 @@ export const appTexts = {
       "Sem conexão com a internet. A ficha será recarregada ao reconectar.",
     sharedCharacterRealtimeClosed: "Tempo real indisponível",
     sharedCharacterRealtimeClosedHelp:
-      "As atualizações automáticas estão indisponíveis. Use Atualizar para buscar o snapshot mais recente.",
+      "As atualizações automáticas estão indisponíveis. Use Atualizar para buscar a versão mais recente.",
     sharedCharacterOwnerLabel: "Compartilhada por",
     sharedCharacterOwnerUnknown: "Proprietário",
     sharedCharacterRevisionLabel: "Revisão",
     sharedCharacterUpdatedLabel: "Atualizada em",
     sharedCharacterRevisionShort: (revision: number) => `rev. ${revision}`,
     sharedCharacterOpen: "Abrir ficha",
-    deleteCharacter: "Apagar personagem",
-    delete: "Apagar",
-    deletePrompt: "Para apagar este personagem, digite exatamente:",
+    deleteCharacter: "Remover deste dispositivo",
+    delete: "Remover",
+    deletePrompt: "Para remover esta ficha deste dispositivo, digite exatamente:",
     deleteDescription:
-      "Essa ação remove o personagem da lista deste dispositivo. Exporte um backup antes se quiser manter uma cópia.",
+      "Esta ação remove a ficha da lista deste dispositivo. A versão na nuvem, os compartilhamentos e as cópias em outros dispositivos não são apagados. Se ela existir somente aqui, exporte um backup antes para manter uma cópia.",
     settingsTitle: "Configurações locais",
     settingsDescription:
-      "Gerencie dados locais, preferências e backups. O app continua funcionando offline; recursos de nuvem são opcionais.",
-    cloudTitle: "Nuvem",
+      "Gerencie preferências, dados deste dispositivo, backups manuais e sua conta. A edição continua disponível offline.",
+    cloudTitle: "Conta e nuvem",
     cloudDescription:
-      "Salve manualmente uma cópia das suas fichas na sua conta sem deixar de usar o app offline.",
+      "Backups da conta são manuais. Fichas com sync ativo são sincronizadas automaticamente e podem ser acessadas em outros dispositivos.",
     cloudStatusSignedOut: "Login necessário",
     cloudStatusSignedIn: "Conectado",
     cloudStatusCheckingSession: "Verificando sessão",
@@ -290,17 +280,17 @@ export const appTexts = {
     cloudLastRestore: (date: string) => new Date(date).toLocaleString("pt-BR"),
     cloudDeviceIdLabel: "Dispositivo",
     cloudAccountLabel: "Conta",
-    cloudOfflineHelp: "Conecte-se à internet para usar backup na nuvem.",
+    cloudOfflineHelp:
+      "Conecte-se à internet para usar sincronização, compartilhamento ou backups na nuvem.",
     cloudLoginRequiredHelp:
-      "Entre na sua conta para salvar ou restaurar backups na nuvem. O app local continua funcionando sem login.",
+      "Entre na sua conta para sincronizar e compartilhar fichas ou salvar e restaurar backups. A edição local continua sem login.",
     cloudSignedInHelp:
-      "Backups são manuais. Suas alterações continuam salvas primeiro neste dispositivo.",
+      "Fichas com sync ativo são sincronizadas automaticamente. Backups continuam manuais e separados da versão viva das fichas.",
     cloudApiPendingHelp:
-      "O backup na nuvem não está disponível neste ambiente. Seus dados locais continuam funcionando normalmente.",
+      "Sincronização, compartilhamento e backups na nuvem não estão disponíveis neste ambiente. Seus dados locais continuam funcionando normalmente.",
     cloudWorking: "Processando...",
     cloudPreparingBackup: "Salvando alterações locais antes do backup...",
     cloudUploadingBackup: "Enviando backup para a nuvem...",
-    cloudBackupSaved: "Backup salvo na nuvem com sucesso.",
     cloudBackupSavedWithCount: (characters: number) =>
       `Backup salvo na nuvem com ${characters} personagem(ns).`,
     cloudBackupDuplicate: "O backup mais recente já contém esses dados. Nada novo foi enviado.",
@@ -320,7 +310,7 @@ export const appTexts = {
     cloudRestoreMergeKeepsLocal:
       "Personagens locais que não existem no backup continuam neste dispositivo.",
     cloudRestoreMergeNotice:
-      "A restauração em modo mesclar não apaga seus dados locais. Metadados deste dispositivo e da conta atual serão preservados.",
+      "A restauração em modo mesclar não apaga fichas ausentes do backup. Os vínculos de sync e compartilhamento não fazem parte do backup e não são restaurados.",
     cloudRestoreMergeConfirm: "Mesclar backup",
     cloudRestoreReplaceStart: "Substituir dados locais",
     cloudRestoreReplaceTitle: "Substituir dados locais por backup da nuvem",
@@ -329,7 +319,7 @@ export const appTexts = {
     cloudRestoreReplaceRemovesLocal:
       "Personagens locais que não existem no backup serão removidos deste dispositivo.",
     cloudRestoreReplaceWarning:
-      "Atenção: esta ação substitui os personagens e configurações locais. Exporte um backup local antes de continuar se quiser manter uma cópia.",
+      "Atenção: esta ação substitui as fichas e configurações deste dispositivo. Os vínculos de sync e compartilhamento não fazem parte do backup; as fichas importadas voltam como locais.",
     cloudRestoreExportLocalFirst: "Exportar backup local antes",
     cloudRestoreReplacePrompt: "Para confirmar, digite exatamente:",
     cloudRestoreReplaceToken: "SUBSTITUIR",
@@ -347,14 +337,12 @@ export const appTexts = {
     authAccountTitle: "Conta conectada",
     authLoginTitle: "Entrar na conta",
     authRegisterTitle: "Criar conta",
-    authDescription:
-      "Backup na nuvem é opcional. Suas fichas continuam disponíveis neste dispositivo e offline.",
     authLoginDescription:
-      "Entre para salvar backups manuais na nuvem. A edição local continua funcionando sem login.",
+      "Entre para sincronizar fichas entre dispositivos, compartilhar em modo leitura e usar backups manuais. A edição local continua sem login.",
     authRegisterDescription:
-      "Crie uma conta para proteger seus backups na nuvem. Suas fichas continuam salvas primeiro neste dispositivo.",
+      "Crie uma conta para sincronizar fichas entre dispositivos, compartilhar em modo leitura e guardar backups manuais. Suas fichas continuam salvas primeiro neste dispositivo.",
     authSignedInDescription:
-      "Sua conta está conectada. Backups continuam sendo uma ação manual e opcional.",
+      "Sua conta está conectada. Fichas com sync ativo sincronizam automaticamente; backups continuam manuais e opcionais.",
     authEmail: "Email",
     authEmailPlaceholder: "voce@email.com",
     authPassword: "Senha",
@@ -365,15 +353,13 @@ export const appTexts = {
     authDisplayNamePlaceholder: "Como você quer aparecer",
     authPasswordHelp: "Use pelo menos 8 caracteres. A senha é protegida no servidor e nunca é salva em texto puro.",
     authLocalFirstNotice:
-      "Suas fichas continuam salvas localmente e disponíveis offline. A nuvem guarda apenas backups enviados por você.",
+      "Suas fichas continuam salvas localmente e disponíveis offline. Na conta ficam as fichas com sync ativado, seus compartilhamentos e os backups enviados manualmente.",
     authModeTabsLabel: "Escolher modo de autenticação",
     authNotAvailableTitle: "Nuvem não configurada",
     authNotAvailableDescription:
-      "O backup na nuvem não está disponível neste ambiente. Você ainda pode salvar um perfil local para identificar este dispositivo.",
+      "Conta, sincronização, compartilhamento e backups na nuvem não estão disponíveis neste ambiente. Você ainda pode salvar um perfil local para identificar este dispositivo.",
     authSignIn: "Entrar",
     authCreateAccount: "Criar conta",
-    authSwitchToRegister: "Criar conta",
-    authSwitchToLogin: "Já tenho conta",
     authMissingFields: "Preencha email e senha.",
     authEmailInvalid: "Digite um email válido.",
     authPasswordTooShort: "A senha precisa ter pelo menos 8 caracteres.",
@@ -381,7 +367,8 @@ export const appTexts = {
     authSuccess: "Sessão iniciada com sucesso.",
     authLoginError: "Não foi possível entrar na conta.",
     authRegisterError: "Não foi possível criar a conta.",
-    authLogoutSuccess: "Você saiu da conta. Seus dados locais continuam neste dispositivo.",
+    authLogoutSuccess:
+      "Você saiu da conta. Seus dados locais continuam neste dispositivo; sync e compartilhamento ficam indisponíveis até entrar novamente.",
     authLogoutError: "Não foi possível sair da conta.",
     requestId: "ID da requisição",
     appVersion: "Versão do app",
@@ -398,29 +385,29 @@ export const appTexts = {
     localData: "Dados locais",
     exportData: "Exportar dados",
     exportDescription:
-      "Baixa um arquivo JSON com personagens, configurações e versão do formato para backup manual.",
+      "Baixa um arquivo JSON com fichas e configurações locais. Conta, compartilhamentos, vínculos de sync e fila pendente não são incluídos.",
     importData: "Importar dados",
     importDescription:
-      "Importe um backup JSON exportado por este app. Valide o arquivo antes de substituir seus dados.",
+      "Importe um backup JSON exportado por este app. As fichas importadas entram como locais, sem restaurar vínculos de sync ou compartilhamento.",
     importMode: "Modo de importação",
     mergeImport: "Mesclar com dados atuais",
     replaceImport: "Substituir todos os dados locais",
     chooseBackupFile: "Escolher arquivo JSON",
     clearData: "Limpar dados locais",
     clearDataDescription:
-      "Remove personagens e configurações deste navegador. Use exportar antes se quiser guardar backup.",
-    clearDataTitle: "Limpar todos os dados locais?",
+      "Remove fichas, alterações pendentes, rascunhos de conflito e configurações deste navegador. Dados já enviados à nuvem e backups da conta não são apagados.",
+    clearDataTitle: "Limpar todos os dados deste dispositivo?",
     clearDataPrompt: "Para confirmar, digite exatamente:",
     clearDataToken: "LIMPAR",
     clearDataWarning:
-      "Essa ação apaga personagens e configurações salvos neste dispositivo. Ela não pode ser desfeita pelo app.",
+      "Essa ação apaga os dados deste dispositivo, incluindo alterações ainda não sincronizadas. Fichas e backups já salvos na nuvem permanecem na conta.",
     exportSuccess: "Backup exportado com sucesso.",
     exportError: "Não foi possível exportar os dados locais.",
     importSuccess: (characters: number, settings: number) =>
       `Importação concluída: ${characters} personagem(ns) e ${settings} configuração(ões).`,
     importError:
       "Não foi possível importar. Verifique se o arquivo é um backup JSON válido deste app.",
-    clearSuccess: "Dados locais apagados.",
+    clearSuccess: "Dados deste dispositivo apagados. A nuvem não foi alterada.",
     clearError: "Não foi possível limpar os dados locais.",
     currentSummary: (characters: number) =>
       `${characters} personagem(ns) ativo(s) neste dispositivo.`,
@@ -450,10 +437,7 @@ export const appTexts = {
     offlineStatus: "Offline",
     offlineBannerTitle: "You are offline",
     offlineBannerDescription:
-      "The app keeps working. Your changes continue being saved on this device.",
-    loginTitle: "Account",
-    loginDescription:
-      "Sign in to use manual cloud backup. The app keeps working locally without login.",
+      "The app keeps working. Changes stay saved on this device and, for synced characters, are queued until the connection returns.",
     profileName: "Profile name",
     saveLogin: "Save local profile",
     cancel: "Cancel",
@@ -472,7 +456,6 @@ export const appTexts = {
     saveError: "Local save error",
     cloudSyncActivate: "Enable sync",
     cloudSyncActivating: "Enabling sync...",
-    cloudSyncActive: "Sync active",
     cloudSyncStatusLabel: "Sync status",
     cloudSyncStatusLocal: "Local only",
     cloudSyncStatusLocalHelp:
@@ -482,19 +465,17 @@ export const appTexts = {
       "The character is being published and linked to the cloud.",
     cloudSyncStatusSynced: "Synced",
     cloudSyncStatusSyncedHelp:
-      "The local snapshot matches the latest revision saved in the cloud.",
+      "This device is aligned with the displayed cloud revision of the character.",
     cloudSyncStatusQueued: "Changes pending",
     cloudSyncStatusQueuedHelp:
-      "There are local changes newer than the last snapshot saved in the cloud.",
+      "Local changes are saved and waiting to be uploaded to the cloud.",
     cloudSyncStatusConflict: "Conflict",
     cloudSyncStatusConflictHelp:
-      "The character needs review before more changes can be uploaded.",
+      "The same fields changed concurrently. Resolve the conflict to resume synchronization.",
     cloudSyncConflictLockTitle: "Editing blocked by conflict",
     cloudSyncConflictLockDescription:
       "Your local changes were preserved. Resolve the conflict before editing this character again.",
     cloudSyncConflictResolveButton: "Resolve conflict",
-    cloudSyncConflictResolutionPending:
-      "The conflict is safely preserved. Open the comparison to review the local and cloud versions.",
     characterConflictTitle: "Resolve sync conflict",
     characterConflictDescription: (name: string) =>
       name
@@ -519,8 +500,6 @@ export const appTexts = {
       "The comparison could not be refreshed. Check your connection and try again.",
     characterConflictDraftStale:
       "There is a saved choice draft for an earlier version of this conflict. It was preserved, but it will not be applied to this comparison.",
-    characterConflictDraftUnsupported:
-      "The saved draft uses the duplicate strategy, which will be added in a later step. Choose again to continue.",
     characterConflictStrategyTitle: "How do you want to choose?",
     characterConflictStrategyDescription:
       "Review each field or fill every choice with one version.",
@@ -548,8 +527,6 @@ export const appTexts = {
       "This value contains a complete structure. The choice replaces the entire block.",
     characterConflictComplexHierarchyHelp:
       "The cloud changed a related parent or child field. The choice applies to the block to avoid an unsafe combination.",
-    characterConflictApplyPending:
-      "You can review the choices now, and they remain saved after closing.",
     characterConflictChooseAll:
       "Choose a version for every field before confirming.",
     characterConflictApplyReady:
@@ -567,15 +544,15 @@ export const appTexts = {
     characterConflictSubmitError:
       "Could not prepare the resolution. The conflict and your choices remain preserved; try again.",
     cloudSyncConflictDeleteHelp:
-      "Resolve the conflict before deleting this character.",
+      "Resolve the conflict before removing this character from this device.",
     cloudSyncStatusReadonly: "Read only",
     cloudSyncStatusReadonlyHelp:
       "This character can be viewed but not edited on this device.",
     cloudSyncStatusRevision: (revision: number) => `rev. ${revision}`,
     cloudSyncActivateHelp:
-      "Publishes this character to your account and links this device to the cloud version.",
+      "Publishes this character to your account, enables automatic synchronization, and allows access from other devices and read-only sharing.",
     cloudSyncActiveHelp:
-      "This character is already linked to a live cloud version.",
+      "This character is linked to the cloud. Local changes are queued and synchronized automatically when connected.",
     cloudSyncOfflineHelp: "Connect to the internet to enable sync for this character.",
     cloudSyncLoginRequiredHelp:
       "Sign in to your account to enable sync for this character.",
@@ -598,7 +575,7 @@ export const appTexts = {
       "Could not load your cloud characters on this device.",
     characterShareButton: "Share",
     characterShareButtonHelp:
-      "Manage who can view the cloud version of this character.",
+      "Manage who can view this character in read-only mode and receive its updates.",
     characterShareOfflineHelp:
       "Connect to the internet to manage sharing for this character.",
     characterShareLoginRequiredHelp:
@@ -622,7 +599,7 @@ export const appTexts = {
     characterShareSending: "Sharing...",
     characterShareCurrentTitle: "Current access",
     characterShareCurrentDescription:
-      "These people can open the latest snapshot available in the cloud.",
+      "These people can open the character in read-only mode. While connected, they receive updates automatically.",
     characterShareLoading: "Loading access...",
     characterShareEmpty: "This character has not been shared yet.",
     characterShareEmailTarget: "E-mail",
@@ -631,7 +608,7 @@ export const appTexts = {
     characterShareRevoke: "Revoke",
     characterShareRevoking: "Revoking...",
     characterShareCreated:
-      "Sharing created. The response does not reveal whether the e-mail already has an account.",
+      "Sharing created. For privacy, we do not reveal whether the e-mail already has an account.",
     characterShareAlreadyExists:
       "This person already has a current share for this character.",
     characterShareRevoked: "Access revoked.",
@@ -694,24 +671,24 @@ export const appTexts = {
       "There is no internet connection. The character will reload after reconnecting.",
     sharedCharacterRealtimeClosed: "Realtime unavailable",
     sharedCharacterRealtimeClosedHelp:
-      "Automatic updates are unavailable. Use Refresh to fetch the latest snapshot.",
+      "Automatic updates are unavailable. Use Refresh to fetch the latest version.",
     sharedCharacterOwnerLabel: "Shared by",
     sharedCharacterOwnerUnknown: "Owner",
     sharedCharacterRevisionLabel: "Revision",
     sharedCharacterUpdatedLabel: "Updated at",
     sharedCharacterRevisionShort: (revision: number) => `rev. ${revision}`,
     sharedCharacterOpen: "Open character",
-    deleteCharacter: "Delete character",
-    delete: "Delete",
-    deletePrompt: "To delete this character, type exactly:",
+    deleteCharacter: "Remove from this device",
+    delete: "Remove",
+    deletePrompt: "To remove this character from this device, type exactly:",
     deleteDescription:
-      "This removes the character from this device's list. Export a backup first if you want to keep a copy.",
+      "This removes the character from this device's list. The cloud version, shares, and copies on other devices are not deleted. If it exists only here, export a backup first to keep a copy.",
     settingsTitle: "Local settings",
     settingsDescription:
-      "Manage local data, preferences, and backups. The app keeps working offline; cloud features are optional.",
-    cloudTitle: "Cloud",
+      "Manage preferences, this device's data, manual backups, and your account. Editing remains available offline.",
+    cloudTitle: "Account and cloud",
     cloudDescription:
-      "Manually save a copy of your sheets to your account without losing offline access.",
+      "Account backups are manual. Characters with sync enabled update automatically and can be accessed from other devices.",
     cloudStatusSignedOut: "Sign-in required",
     cloudStatusSignedIn: "Signed in",
     cloudStatusCheckingSession: "Checking session",
@@ -727,17 +704,17 @@ export const appTexts = {
     cloudLastRestore: (date: string) => new Date(date).toLocaleString("en-US"),
     cloudDeviceIdLabel: "Device",
     cloudAccountLabel: "Account",
-    cloudOfflineHelp: "Connect to the internet to use cloud backup.",
+    cloudOfflineHelp:
+      "Connect to the internet to use synchronization, sharing, or cloud backups.",
     cloudLoginRequiredHelp:
-      "Sign in to save or restore cloud backups. The local app keeps working without login.",
+      "Sign in to sync and share characters or save and restore backups. Local editing keeps working without login.",
     cloudSignedInHelp:
-      "Backups are manual. Your changes are still saved to this device first.",
+      "Characters with sync enabled update automatically. Backups remain manual and separate from the live character version.",
     cloudApiPendingHelp:
-      "Cloud backup is not available in this environment. Your local data keeps working normally.",
+      "Synchronization, sharing, and cloud backups are not available in this environment. Your local data keeps working normally.",
     cloudWorking: "Working...",
     cloudPreparingBackup: "Saving local changes before backup...",
     cloudUploadingBackup: "Uploading backup to the cloud...",
-    cloudBackupSaved: "Cloud backup saved successfully.",
     cloudBackupSavedWithCount: (characters: number) =>
       `Cloud backup saved with ${characters} character(s).`,
     cloudBackupDuplicate: "The latest backup already contains this data. Nothing new was uploaded.",
@@ -757,7 +734,7 @@ export const appTexts = {
     cloudRestoreMergeKeepsLocal:
       "Local characters that do not exist in the backup remain on this device.",
     cloudRestoreMergeNotice:
-      "Merge restore does not delete your local data. This device's metadata and current account hint will be preserved.",
+      "Merge restore does not delete characters absent from the backup. Sync links and shares are not part of the backup and are not restored.",
     cloudRestoreMergeConfirm: "Merge backup",
     cloudRestoreReplaceStart: "Replace local data",
     cloudRestoreReplaceTitle: "Replace local data with cloud backup",
@@ -766,7 +743,7 @@ export const appTexts = {
     cloudRestoreReplaceRemovesLocal:
       "Local characters that do not exist in the backup will be removed from this device.",
     cloudRestoreReplaceWarning:
-      "Warning: this action replaces local characters and settings. Export a local backup before continuing if you want to keep a copy.",
+      "Warning: this action replaces the characters and settings on this device. Sync links and shares are not part of the backup; imported characters return as local-only.",
     cloudRestoreExportLocalFirst: "Export local backup first",
     cloudRestoreReplacePrompt: "To confirm, type exactly:",
     cloudRestoreReplaceToken: "REPLACE",
@@ -784,14 +761,12 @@ export const appTexts = {
     authAccountTitle: "Connected account",
     authLoginTitle: "Sign in",
     authRegisterTitle: "Create account",
-    authDescription:
-      "Cloud backup is optional. Your sheets remain available on this device and offline.",
     authLoginDescription:
-      "Sign in to save manual cloud backups. Local editing keeps working without login.",
+      "Sign in to sync characters across devices, share them in read-only mode, and use manual backups. Local editing keeps working without login.",
     authRegisterDescription:
-      "Create an account to protect your cloud backups. Your sheets are still saved to this device first.",
+      "Create an account to sync characters across devices, share them in read-only mode, and keep manual backups. Your characters are still saved to this device first.",
     authSignedInDescription:
-      "Your account is connected. Backups are still manual and optional.",
+      "Your account is connected. Characters with sync enabled update automatically; backups remain manual and optional.",
     authEmail: "Email",
     authEmailPlaceholder: "you@example.com",
     authPassword: "Password",
@@ -802,15 +777,13 @@ export const appTexts = {
     authDisplayNamePlaceholder: "How you want to appear",
     authPasswordHelp: "Use at least 8 characters. Your password is protected on the server and is never stored as plain text.",
     authLocalFirstNotice:
-      "Your sheets remain saved locally and available offline. The cloud stores only backups you send manually.",
+      "Your characters remain saved locally and available offline. Your account stores characters with sync enabled, their shares, and backups you send manually.",
     authModeTabsLabel: "Choose authentication mode",
     authNotAvailableTitle: "Cloud unavailable",
     authNotAvailableDescription:
-      "Cloud backup is not available in this environment. You can still save a local profile to identify this device.",
+      "Account, synchronization, sharing, and cloud backups are not available in this environment. You can still save a local profile to identify this device.",
     authSignIn: "Sign in",
     authCreateAccount: "Create account",
-    authSwitchToRegister: "Create account",
-    authSwitchToLogin: "I already have an account",
     authMissingFields: "Fill in email and password.",
     authEmailInvalid: "Enter a valid email address.",
     authPasswordTooShort: "Password must be at least 8 characters.",
@@ -818,7 +791,8 @@ export const appTexts = {
     authSuccess: "Signed in successfully.",
     authLoginError: "Could not sign in.",
     authRegisterError: "Could not create the account.",
-    authLogoutSuccess: "You signed out. Your local data remains on this device.",
+    authLogoutSuccess:
+      "You signed out. Your local data remains on this device; sync and sharing stay unavailable until you sign in again.",
     authLogoutError: "Could not sign out.",
     requestId: "Request ID",
     appVersion: "App version",
@@ -835,29 +809,29 @@ export const appTexts = {
     localData: "Local data",
     exportData: "Export data",
     exportDescription:
-      "Downloads a JSON file with characters, settings, and format version for manual backup.",
+      "Downloads a JSON file with local characters and settings. Account data, shares, sync links, and the pending queue are not included.",
     importData: "Import data",
     importDescription:
-      "Import a JSON backup exported by this app. Validate the file before replacing your data.",
+      "Import a JSON backup exported by this app. Imported characters return as local-only, without restoring sync links or shares.",
     importMode: "Import mode",
     mergeImport: "Merge with current data",
     replaceImport: "Replace all local data",
     chooseBackupFile: "Choose JSON file",
     clearData: "Clear local data",
     clearDataDescription:
-      "Removes characters and settings from this browser. Export first if you want to keep a backup.",
-    clearDataTitle: "Clear all local data?",
+      "Removes characters, pending changes, conflict drafts, and settings from this browser. Data already uploaded to the cloud and account backups are not deleted.",
+    clearDataTitle: "Clear all data from this device?",
     clearDataPrompt: "To confirm, type exactly:",
     clearDataToken: "CLEAR",
     clearDataWarning:
-      "This deletes characters and settings saved on this device. It cannot be undone by the app.",
+      "This deletes this device's data, including changes that have not synced yet. Characters and backups already stored in the cloud remain in the account.",
     exportSuccess: "Backup exported successfully.",
     exportError: "Could not export local data.",
     importSuccess: (characters: number, settings: number) =>
       `Import finished: ${characters} character(s) and ${settings} setting(s).`,
     importError:
       "Could not import. Make sure the file is a valid JSON backup from this app.",
-    clearSuccess: "Local data cleared.",
+    clearSuccess: "This device's data was cleared. The cloud was not changed.",
     clearError: "Could not clear local data.",
     currentSummary: (characters: number) =>
       `${characters} active character(s) on this device.`,

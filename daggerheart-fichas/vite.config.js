@@ -17,7 +17,7 @@ export default defineConfig({
         name: 'Daggerheart Fichas',
         short_name: 'Fichas RPG',
         description:
-          'App local-first para criar, editar e consultar fichas de RPG offline.',
+          'App local-first para fichas de Daggerheart, com edição offline, sincronização entre dispositivos, compartilhamento em modo leitura e backups manuais.',
         lang: 'pt-BR',
         start_url: '/',
         scope: '/',
