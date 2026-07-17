@@ -171,6 +171,16 @@ def test_character_event_has_domain_check_constraints() -> None:
         "ck_character_events_server_revision_positive",
     }
 
+    compacted_constraint = next(
+        constraint
+        for constraint in CharacterEvent.__table__.constraints
+        if isinstance(constraint, CheckConstraint)
+        and constraint.name == "ck_character_events_compacted_patch_format"
+    )
+    compacted_sql = str(compacted_constraint.sqltext)
+    assert "patch = '{\"format\":\"changed_paths_v1\"}'::jsonb" in compacted_sql
+    assert "jsonb_object_length" not in compacted_sql
+
 
 def test_character_event_has_replay_retention_and_uniqueness_indexes() -> None:
     indexes = {

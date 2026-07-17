@@ -68,9 +68,8 @@ class CharacterEvent(Base):
         ),
         CheckConstraint(
             "compacted_at IS NULL "
-            "OR (jsonb_typeof(patch) = 'object' "
-            "AND patch ->> 'format' = 'changed_paths_v1' "
-            "AND jsonb_object_length(patch) = 1)",
+            "OR (patch IS NOT NULL "
+            "AND patch = '{\"format\":\"changed_paths_v1\"}'::jsonb)",
             name="compacted_patch_format",
         ),
         Index(

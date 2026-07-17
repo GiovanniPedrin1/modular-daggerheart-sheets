@@ -69,9 +69,14 @@ def test_upgrade_adds_compaction_marker_contract_without_rewriting_other_patches
     assert "event_type = 'updated'" in constraints[
         "ck_character_events_compacted_event_shape"
     ]
-    assert "jsonb_typeof(patch) = 'object'" in constraints[
+    compacted_patch_constraint = constraints[
         "ck_character_events_compacted_patch_format"
     ]
+    assert "patch IS NOT NULL" in compacted_patch_constraint
+    assert "patch = '{\"format\":\"changed_paths_v1\"}'::jsonb" in (
+        compacted_patch_constraint
+    )
+    assert "jsonb_object_length" not in compacted_patch_constraint
 
     fake_op.create_index.assert_called_once()
     index_call = fake_op.create_index.call_args
