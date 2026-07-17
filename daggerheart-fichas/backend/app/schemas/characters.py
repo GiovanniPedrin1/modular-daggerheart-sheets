@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.core.security_contracts import MAX_CHARACTER_SERVER_REVISION
+
 type CloudCharacterSystem = Literal["daggerheart", "custom"]
 type CloudCharacterLanguage = Literal["pt-BR", "en-US"]
 type DaggerheartClassKey = Literal[
@@ -68,7 +70,7 @@ class CloudCharacterSnapshotInput(CloudCharacterSnapshotFields):
                 separators=(",", ":"),
                 allow_nan=False,
             )
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, RecursionError) as exc:
             raise ValueError("data must contain only JSON-compatible values") from exc
         return value
 
@@ -87,7 +89,7 @@ class CreateCloudCharacterRequest(CloudCharacterSnapshotInput):
 
 
 class UpdateCloudCharacterRequest(CloudCharacterSnapshotInput):
-    base_revision: int = Field(ge=1, alias="baseRevision")
+    base_revision: int = Field(ge=1, le=MAX_CHARACTER_SERVER_REVISION, alias="baseRevision")
     device_id: str = Field(min_length=1, max_length=128, alias="deviceId")
 
     @field_validator("device_id")
@@ -145,9 +147,7 @@ class CreateCloudCharacterResponse(CloudCharacterSchema):
         if self.created and self.reason is not None:
             raise ValueError("reason must be null when created is true")
         if not self.created and self.reason != "existing_identical_snapshot":
-            raise ValueError(
-                "reason must be existing_identical_snapshot when created is false"
-            )
+            raise ValueError("reason must be existing_identical_snapshot when created is false")
         return self
 
 

@@ -273,4 +273,40 @@ describe("sync queue drain worker", () => {
     );
     expect(calculateSyncRetryAt(2, new Date(startedAt))).toBe(expectedRetryAt);
   });
+
+  it("respects a server Retry-After value longer than local backoff", async () => {
+    const record = makeRecord("1", { retryCount: 0 });
+    const markErrored = vi.fn(async (_id, input) => {
+      record.status = input.status;
+      record.nextAttemptAt = input.nextAttemptAt;
+    });
+    const worker = createSyncQueueDrainWorker({
+      listRecords: async () => [record],
+      markSyncing: async () => {
+        record.status = "syncing";
+      },
+      sendMutation: async () => {
+        throw new ApiClientError({
+          status: 429,
+          code: "RATE_LIMITED",
+          message: "slow down",
+          retryAfterMs: 60_000,
+        });
+      },
+      completeApplied: vi.fn(),
+      markErrored,
+      requeue: vi.fn(),
+      now: () => new Date(startedAt),
+    });
+
+    const result = await worker.drain({ ownerUserId: "owner-id" });
+    const expectedRetryAt = new Date(Date.parse(startedAt) + 60_000).toISOString();
+
+    expect(result.nextAttemptAt).toBe(expectedRetryAt);
+    expect(markErrored).toHaveBeenCalledWith(
+      "1",
+      expect.objectContaining({ nextAttemptAt: expectedRetryAt }),
+    );
+  });
+
 });

@@ -95,6 +95,18 @@ class CharacterShare(Base):
                 "status = 'active' AND target_user_id IS NOT NULL"
             ),
         ),
+        Index(
+            "idx_character_shares_pending_created",
+            "created_at",
+            "id",
+            postgresql_where=text("status = 'pending'"),
+        ),
+        Index(
+            "idx_character_shares_revoked_at",
+            "revoked_at",
+            "id",
+            postgresql_where=text("status = 'revoked' AND revoked_at IS NOT NULL"),
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(

@@ -60,6 +60,19 @@ class CharacterEvent(Base):
             "AND jsonb_array_length(changed_paths) BETWEEN 1 AND 128)",
             name="changed_paths_array",
         ),
+        CheckConstraint(
+            "compacted_at IS NULL "
+            "OR (event_type = 'updated' AND snapshot IS NULL "
+            "AND patch IS NOT NULL AND changed_paths IS NOT NULL)",
+            name="compacted_event_shape",
+        ),
+        CheckConstraint(
+            "compacted_at IS NULL "
+            "OR (jsonb_typeof(patch) = 'object' "
+            "AND patch ->> 'format' = 'changed_paths_v1' "
+            "AND jsonb_object_length(patch) = 1)",
+            name="compacted_patch_format",
+        ),
         Index(
             "uq_character_events_character_content_revision",
             "character_id",
@@ -83,6 +96,12 @@ class CharacterEvent(Base):
             "created_at",
         ),
         Index(
+            "idx_character_events_compacted_created",
+            "created_at",
+            "id",
+            postgresql_where=text("compacted_at IS NOT NULL"),
+        ),
+        Index(
             "idx_character_events_audience_cursor",
             "audience_user_id",
             "id",
@@ -104,6 +123,10 @@ class CharacterEvent(Base):
     event_type: Mapped[str] = mapped_column(String(32), nullable=False)
     snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     patch: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    compacted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     changed_paths: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     actor_user_id: Mapped[UUID | None] = mapped_column(
         PostgresUUID(as_uuid=True),

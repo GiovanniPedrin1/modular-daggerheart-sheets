@@ -3,10 +3,23 @@ from __future__ import annotations
 from typing import NoReturn
 from uuid import UUID
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 
 from app.api.dependencies import CurrentUser, DbSession, SettingsDep
 from app.api.errors import api_error
+from app.api.payload_limits import enforce_feature_request_body_limit
+from app.api.rate_limits import (
+    enforce_character_mutation_rate_limit,
+    enforce_share_write_rate_limit,
+    enforce_user_read_rate_limit,
+    enforce_user_write_rate_limit,
+)
+from app.api.rollout import (
+    require_character_sharing_writes,
+    require_cloud_mutations,
+    require_cloud_snapshot_writes,
+)
+from app.core import audit_actions
 from app.core.config import Settings
 from app.models.character_share import CharacterShare
 from app.models.cloud_character import CloudCharacter
@@ -45,11 +58,11 @@ from app.schemas.shares import (
     ListCharacterSharesResponse,
     RevokeCharacterShareResponse,
 )
-from app.services import character_event_service as event_service
+from app.services import audit_service, share_target_service
 from app.services import character_mutation_service as mutation_service
+from app.services import character_mutation_transaction_service as mutation_transaction_service
 from app.services import character_share_service as share_service
 from app.services import cloud_character_service as character_service
-from app.services import share_target_service
 
 router = APIRouter(prefix="/characters/cloud", tags=["cloud-characters"])
 
@@ -116,6 +129,26 @@ def raise_cloud_character_api_error(
             "CHARACTER_TOO_LARGE",
             "Cloud character snapshot is too large.",
             detail.model_dump(by_alias=True, mode="json"),
+        ) from error
+
+    if isinstance(error, character_service.InvalidCloudCharacterPayloadError):
+        raise api_error(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "INVALID_CHARACTER_PAYLOAD",
+            "The cloud character contains an unsupported or excessive JSON value.",
+            error.validation_error.public_detail(),
+        ) from error
+
+    if isinstance(error, character_service.CloudCharacterIdentifierTooLongError):
+        raise api_error(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "INVALID_CHARACTER_IDENTIFIER",
+            "A cloud character transport identifier exceeds the configured limit.",
+            {
+                "field": error.field,
+                "maxLength": error.max_length,
+                "actualLength": error.actual_length,
+            },
         ) from error
 
     if isinstance(
@@ -192,6 +225,21 @@ def raise_character_mutation_service_error(
     raise error
 
 
+def raise_character_mutation_transaction_error(
+    error: mutation_transaction_service.CharacterMutationTransactionError,
+) -> NoReturn:
+    if isinstance(error, mutation_transaction_service.CharacterWriteBusyError):
+        raise api_error(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "CHARACTER_WRITE_BUSY",
+            "The character is temporarily busy. Retry the same mutation shortly.",
+            {"attempts": error.attempts},
+            headers={"Retry-After": str(error.retry_after_seconds)},
+        ) from error
+
+    raise error
+
+
 def raise_character_mutation_result_api_error(
     result: mutation_service.CharacterMutationConflictResult
     | mutation_service.CharacterMutationRejectedResult,
@@ -244,9 +292,9 @@ def raise_character_mutation_result_api_error(
                 actualBytes=result.actual_bytes,
             ).model_dump(by_alias=True, mode="json")
         else:
-            detail = CharacterMutationRejectedDetail.from_mutation(
-                result.mutation
-            ).model_dump(by_alias=True, mode="json")
+            detail = CharacterMutationRejectedDetail.from_mutation(result.mutation).model_dump(
+                by_alias=True, mode="json"
+            )
         raise api_error(
             status.HTTP_413_CONTENT_TOO_LARGE,
             code,
@@ -292,6 +340,7 @@ def raise_character_mutation_result_api_error(
     "",
     response_model=CreateCloudCharacterResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(enforce_user_write_rate_limit)],
     responses={
         status.HTTP_200_OK: {
             "description": "An identical active snapshot already exists; the retry is idempotent."
@@ -313,7 +362,15 @@ async def create_cloud_character(
     session: DbSession,
     settings: SettingsDep,
     current_user: CurrentUser,
+    request: Request,
 ) -> CreateCloudCharacterResponse:
+    require_cloud_snapshot_writes(settings)
+    enforce_feature_request_body_limit(
+        request,
+        max_bytes=settings.max_cloud_character_payload_bytes,
+        code="CHARACTER_TOO_LARGE",
+        message="Cloud character request body is too large.",
+    )
     try:
         result = await character_service.create_cloud_character(
             session,
@@ -325,6 +382,21 @@ async def create_cloud_character(
         raise_cloud_character_api_error(error)
 
     if result.created:
+        await audit_service.append_audit_event(
+            session,
+            action=audit_actions.CHARACTER_CREATED,
+            actor_user_id=current_user.id,
+            character_id=result.character.id,
+            resource_type="cloud_character",
+            resource_id=result.character.id,
+            device_id=input_data.device_id,
+            metadata={
+                "schemaVersion": result.character.schema_version,
+                "serverRevision": result.character.server_revision,
+                "system": result.character.system,
+            },
+            settings=settings,
+        )
         await session.commit()
         await session.refresh(result.character)
         response.status_code = status.HTTP_201_CREATED
@@ -338,7 +410,11 @@ async def create_cloud_character(
     )
 
 
-@router.get("", response_model=ListCloudCharactersResponse)
+@router.get(
+    "",
+    response_model=ListCloudCharactersResponse,
+    dependencies=[Depends(enforce_user_read_rate_limit)],
+)
 async def list_cloud_characters(
     session: DbSession,
     current_user: CurrentUser,
@@ -356,6 +432,7 @@ async def list_cloud_characters(
     "/{character_id}/shares",
     response_model=CreateCharacterShareResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(enforce_share_write_rate_limit)],
     responses={
         status.HTTP_200_OK: {
             "description": "The current target is already shared; the retry is idempotent."
@@ -376,8 +453,18 @@ async def create_character_share(
     input_data: CreateCharacterShareRequest,
     response: Response,
     session: DbSession,
+    settings: SettingsDep,
     current_user: CurrentUser,
 ) -> CreateCharacterShareResponse:
+    require_character_sharing_writes(settings)
+    if len(input_data.normalized_target) > settings.max_share_target_length:
+        raise api_error(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "INVALID_SHARE_TARGET",
+            "The share target could not identify a recipient.",
+            {"targetType": input_data.target_kind},
+        )
+
     try:
         result = await share_service.create_character_share(
             session,
@@ -393,6 +480,20 @@ async def create_character_share(
         raise_character_share_api_error(error)
 
     if result.created:
+        await audit_service.append_audit_event(
+            session,
+            action=audit_actions.CHARACTER_SHARE_CREATED,
+            actor_user_id=current_user.id,
+            target_user_id=result.share.target_user_id,
+            character_id=character_id,
+            resource_type="character_share",
+            resource_id=result.share.id,
+            metadata={
+                "status": result.share.status,
+                "targetType": input_data.target_kind,
+            },
+            settings=settings,
+        )
         await session.commit()
         await session.refresh(result.share)
         response.status_code = status.HTTP_201_CREATED
@@ -409,6 +510,7 @@ async def create_character_share(
 @router.get(
     "/{character_id}/shares",
     response_model=ListCharacterSharesResponse,
+    dependencies=[Depends(enforce_user_read_rate_limit)],
     responses={
         status.HTTP_404_NOT_FOUND: {
             "description": "The character is missing, deleted, or owned by another user."
@@ -429,14 +531,13 @@ async def list_character_shares(
     except character_service.CloudCharacterServiceError as error:
         raise_character_share_api_error(error)
 
-    return ListCharacterSharesResponse(
-        shares=[to_public_share(share) for share in shares]
-    )
+    return ListCharacterSharesResponse(shares=[to_public_share(share) for share in shares])
 
 
 @router.delete(
     "/{character_id}/shares/{share_id}",
     response_model=RevokeCharacterShareResponse,
+    dependencies=[Depends(enforce_share_write_rate_limit)],
     responses={
         status.HTTP_404_NOT_FOUND: {
             "description": (
@@ -450,8 +551,10 @@ async def revoke_character_share(
     character_id: UUID,
     share_id: UUID,
     session: DbSession,
+    settings: SettingsDep,
     current_user: CurrentUser,
 ) -> RevokeCharacterShareResponse:
+    require_character_sharing_writes(settings)
     try:
         result = await share_service.revoke_character_share(
             session,
@@ -465,6 +568,15 @@ async def revoke_character_share(
     ) as error:
         raise_character_share_api_error(error)
 
+    await audit_service.append_audit_event(
+        session,
+        action=audit_actions.CHARACTER_SHARE_REVOKED,
+        actor_user_id=current_user.id,
+        target_user_id=result.target_user_id,
+        character_id=character_id,
+        resource_type="character_share",
+        resource_id=result.share_id,
+    )
     await session.commit()
     return RevokeCharacterShareResponse(
         share_id=result.share_id,
@@ -476,6 +588,7 @@ async def revoke_character_share(
 @router.get(
     "/{character_id}",
     response_model=GetCloudCharacterResponse,
+    dependencies=[Depends(enforce_user_read_rate_limit)],
     responses={
         status.HTTP_404_NOT_FOUND: {
             "description": "The character is missing, deleted, or owned by another user."
@@ -502,6 +615,7 @@ async def get_cloud_character(
 @router.patch(
     "/{character_id}",
     response_model=UpdateCloudCharacterResponse | CharacterMutationAppliedResponse,
+    dependencies=[Depends(enforce_character_mutation_rate_limit)],
     responses={
         status.HTTP_404_NOT_FOUND: {
             "description": "The character is missing, deleted, or owned by another user."
@@ -529,10 +643,18 @@ async def update_cloud_character(
     session: DbSession,
     settings: SettingsDep,
     current_user: CurrentUser,
+    request: Request,
 ) -> UpdateCloudCharacterResponse | CharacterMutationAppliedResponse:
     if isinstance(input_data, CharacterMutationRequest):
+        require_cloud_mutations(settings)
+        enforce_feature_request_body_limit(
+            request,
+            max_bytes=settings.max_character_mutation_payload_bytes,
+            code="MUTATION_TOO_LARGE",
+            message="The character mutation request body is too large.",
+        )
         try:
-            mutation_result = await mutation_service.apply_owner_character_mutation(
+            mutation_result = await mutation_transaction_service.execute_owner_character_mutation(
                 session,
                 owner_user_id=current_user.id,
                 character_id=character_id,
@@ -543,36 +665,31 @@ async def update_cloud_character(
             raise_cloud_character_api_error(error)
         except mutation_service.CharacterMutationServiceError as error:
             raise_character_mutation_service_error(error)
+        except mutation_transaction_service.CharacterMutationTransactionError as error:
+            raise_character_mutation_transaction_error(error)
 
         if isinstance(
             mutation_result,
             mutation_service.CharacterMutationAppliedResult,
         ):
-            if mutation_result.should_emit_updated_event:
-                await event_service.append_character_updated_event(
-                    session,
-                    character=mutation_result.character,
-                    actor_user_id=current_user.id,
-                    changed_paths=mutation_result.mutation.changed_paths,
-                    device_id=mutation_result.mutation.device_id,
-                )
-
-            await session.commit()
-            if mutation_result.should_emit_updated_event:
-                await session.refresh(mutation_result.character)
-
             return CharacterMutationAppliedResponse.from_mutation(
                 mutation_result.mutation,
                 mutation_result.character,
                 duplicate=mutation_result.duplicate,
             )
 
-        await session.commit()
         raise_character_mutation_result_api_error(
             mutation_result,
             settings=settings,
         )
 
+    require_cloud_snapshot_writes(settings)
+    enforce_feature_request_body_limit(
+        request,
+        max_bytes=settings.max_cloud_character_payload_bytes,
+        code="CHARACTER_TOO_LARGE",
+        message="Cloud character request body is too large.",
+    )
     try:
         result = await character_service.update_cloud_character(
             session,
@@ -584,6 +701,22 @@ async def update_cloud_character(
     except character_service.CloudCharacterServiceError as error:
         raise_cloud_character_api_error(error)
 
+    if not result.unchanged:
+        await audit_service.append_audit_event(
+            session,
+            action=audit_actions.CHARACTER_SNAPSHOT_UPDATED,
+            actor_user_id=current_user.id,
+            character_id=character_id,
+            resource_type="cloud_character",
+            resource_id=character_id,
+            device_id=input_data.device_id,
+            metadata={
+                "baseRevision": input_data.base_revision,
+                "serverRevision": result.character.server_revision,
+                "schemaVersion": result.character.schema_version,
+            },
+            settings=settings,
+        )
     await session.commit()
     if not result.unchanged:
         await session.refresh(result.character)
@@ -597,6 +730,7 @@ async def update_cloud_character(
 @router.delete(
     "/{character_id}",
     response_model=DeleteCloudCharacterResponse,
+    dependencies=[Depends(enforce_character_mutation_rate_limit)],
     responses={
         status.HTTP_404_NOT_FOUND: {
             "description": "The character is missing, already deleted, or owned by another user."
@@ -606,8 +740,10 @@ async def update_cloud_character(
 async def delete_cloud_character(
     character_id: UUID,
     session: DbSession,
+    settings: SettingsDep,
     current_user: CurrentUser,
 ) -> DeleteCloudCharacterResponse:
+    require_cloud_snapshot_writes(settings)
     try:
         result = await character_service.soft_delete_cloud_character(
             session,
@@ -617,6 +753,14 @@ async def delete_cloud_character(
     except character_service.CloudCharacterServiceError as error:
         raise_cloud_character_api_error(error)
 
+    await audit_service.append_audit_event(
+        session,
+        action=audit_actions.CHARACTER_DELETED,
+        actor_user_id=current_user.id,
+        character_id=result.character_id,
+        resource_type="cloud_character",
+        resource_id=result.character_id,
+    )
     await session.commit()
     return DeleteCloudCharacterResponse(
         character_id=result.character_id,

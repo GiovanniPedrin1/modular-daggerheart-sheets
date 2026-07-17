@@ -364,6 +364,7 @@ async def test_paginated_revision_replay_advances_cursor_before_live_poll(
         prepared,
         replay_value=4,
         batch_size=1,
+        query_timeout_seconds=5.0,
     )
     assert observed_live_cursor == [11]
 
@@ -531,8 +532,8 @@ def test_http_live_stream_uses_sse_headers_and_last_event_id(monkeypatch) -> Non
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
-    assert response.headers["cache-control"] == "no-cache, no-transform"
-    assert response.headers["connection"] == "keep-alive"
+    assert response.headers["cache-control"] == "no-cache, no-store, private, no-transform"
+    assert "connection" not in response.headers
     assert response.headers["x-accel-buffering"] == "no"
     assert response.text == ": heartbeat\n\n"
     position = prepare.await_args.kwargs["position"]

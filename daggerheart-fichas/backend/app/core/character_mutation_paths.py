@@ -2,9 +2,17 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 
-MAX_CHARACTER_MUTATION_OPERATIONS = 128
-MAX_CHARACTER_MUTATION_PATH_LENGTH = 512
-MAX_CHARACTER_MUTATION_PATH_SEGMENTS = 32
+from app.core import security_contracts
+
+MAX_CHARACTER_MUTATION_OPERATIONS = (
+    security_contracts.ABSOLUTE_MAX_CHARACTER_MUTATION_OPERATIONS
+)
+MAX_CHARACTER_MUTATION_PATH_LENGTH = (
+    security_contracts.ABSOLUTE_MAX_CHARACTER_MUTATION_PATH_LENGTH
+)
+MAX_CHARACTER_MUTATION_PATH_SEGMENTS = (
+    security_contracts.ABSOLUTE_MAX_CHARACTER_MUTATION_PATH_SEGMENTS
+)
 
 ALLOWED_CHARACTER_MUTATION_ROOT_PATHS = frozenset(
     {"name", "system", "classKey", "language", "data"}

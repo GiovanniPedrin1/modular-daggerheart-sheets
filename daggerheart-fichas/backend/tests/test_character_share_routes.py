@@ -124,6 +124,7 @@ async def test_create_share_route_commits_and_refreshes_new_share(monkeypatch) -
         response=response,
         session=session,
         current_user=owner,
+        settings=Settings(app_env="test"),
     )
 
     assert response.status_code == status.HTTP_201_CREATED
@@ -170,6 +171,7 @@ async def test_create_share_route_returns_idempotent_200_without_commit(monkeypa
         response=response,
         session=session,
         current_user=owner,
+        settings=Settings(app_env="test"),
     )
 
     assert response.status_code == status.HTTP_200_OK
@@ -233,6 +235,7 @@ async def test_revoke_share_route_commits_soft_revocation(monkeypatch) -> None:
         character_id=character_id,
         share_id=share_id,
         session=session,
+        settings=Settings(app_env="test"),
         current_user=owner,
     )
 
@@ -391,9 +394,7 @@ def test_revoke_share_http_contract_uses_camel_case(monkeypatch) -> None:
     )
 
     with authenticated_client(owner=owner) as client:
-        response = client.delete(
-            f"/characters/cloud/{character_id}/shares/{share_id}"
-        )
+        response = client.delete(f"/characters/cloud/{character_id}/shares/{share_id}")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -410,11 +411,7 @@ def test_unknown_public_code_returns_typed_422(monkeypatch) -> None:
     monkeypatch.setattr(
         routes.share_service,
         "create_character_share",
-        AsyncMock(
-            side_effect=share_target_service.InvalidShareTargetError(
-                "publicUserCode"
-            )
-        ),
+        AsyncMock(side_effect=share_target_service.InvalidShareTargetError("publicUserCode")),
     )
 
     with authenticated_client(owner=owner) as client:
@@ -492,9 +489,7 @@ def test_non_owned_character_is_masked_as_cloud_character_not_found(
         elif method == "get":
             response = client.get(f"/characters/cloud/{character_id}/shares")
         else:
-            response = client.delete(
-                f"/characters/cloud/{character_id}/shares/{share_id}"
-            )
+            response = client.delete(f"/characters/cloud/{character_id}/shares/{share_id}")
 
     assert response.status_code == 404
     assert response.json() == {
@@ -520,9 +515,7 @@ def test_repeated_or_foreign_revoke_returns_typed_404(monkeypatch) -> None:
     )
 
     with authenticated_client(owner=owner) as client:
-        response = client.delete(
-            f"/characters/cloud/{character_id}/shares/{share_id}"
-        )
+        response = client.delete(f"/characters/cloud/{character_id}/shares/{share_id}")
 
     assert response.status_code == 404
     assert response.json()["code"] == "CHARACTER_SHARE_NOT_FOUND"
@@ -561,4 +554,27 @@ def test_invalid_share_payload_is_rejected_before_service(
         )
 
     assert response.status_code == 422
+    create_mock.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_create_share_rejects_target_above_configured_limit(monkeypatch) -> None:
+    owner = make_owner()
+    session = make_session()
+    create_mock = AsyncMock()
+    monkeypatch.setattr(routes.share_service, "create_character_share", create_mock)
+    input_data = CreateCharacterShareRequest(targetEmail=f"{'a' * 60}@example.com")
+
+    with pytest.raises(HTTPException) as exc_info:
+        await routes.create_character_share(
+            character_id=uuid4(),
+            input_data=input_data,
+            response=Response(),
+            session=session,
+            settings=Settings(app_env="test", max_share_target_length=64),
+            current_user=owner,
+        )
+
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.detail["code"] == "INVALID_SHARE_TARGET"
     create_mock.assert_not_awaited()

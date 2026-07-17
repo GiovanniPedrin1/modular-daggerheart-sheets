@@ -16,8 +16,10 @@ from app.core.character_mutation_paths import (
     CharacterMutationPathError,
     find_conflicting_character_mutation_paths,
     normalize_character_mutation_path,
+    parse_character_mutation_path,
 )
 from app.core.config import Settings
+from app.core.payload_validation import JsonPayloadValidationError, validate_json_payload
 from app.models.character_event import CharacterEvent
 from app.models.character_mutation import CharacterMutation
 from app.models.cloud_character import CloudCharacter
@@ -53,9 +55,7 @@ class CharacterMutationIdempotencyKeyReuseError(CharacterMutationServiceError):
     ) -> None:
         self.mutation = mutation
         self.received_request_hash = received_request_hash
-        super().__init__(
-            "The mutation idempotency key was already used with a different payload"
-        )
+        super().__init__("The mutation idempotency key was already used with a different payload")
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +122,13 @@ class CharacterRemotePathHistory:
     oldest_available_revision: int | None
 
 
+class _CharacterMutationContractError(Exception):
+    def __init__(self, *, reason: str, path: str | None = None) -> None:
+        self.reason = reason
+        self.path = path
+        super().__init__(reason)
+
+
 class _CharacterRemoteHistoryUnavailable(Exception):
     def __init__(
         self,
@@ -158,6 +165,70 @@ def _canonical_request_size(input_data: CharacterMutationRequest) -> int:
         allow_nan=False,
     ).encode("utf-8")
     return len(encoded)
+
+
+def _validate_configured_mutation_contract(
+    input_data: CharacterMutationRequest,
+    *,
+    settings: Settings,
+) -> None:
+    if len(input_data.device_id) > settings.max_device_id_length:
+        raise _CharacterMutationContractError(
+            reason=(
+                "deviceId exceeds the configured maximum length of "
+                f"{settings.max_device_id_length}."
+            ),
+            path="/deviceId",
+        )
+
+    if len(input_data.operations) > settings.max_character_mutation_operations:
+        raise _CharacterMutationContractError(
+            reason=(
+                "operations exceeds the configured maximum item count of "
+                f"{settings.max_character_mutation_operations}."
+            ),
+            path="/operations",
+        )
+
+    if len(input_data.changed_paths) > settings.max_character_mutation_changed_paths:
+        raise _CharacterMutationContractError(
+            reason=(
+                "changedPaths exceeds the configured maximum item count of "
+                f"{settings.max_character_mutation_changed_paths}."
+            ),
+            path="/changedPaths",
+        )
+
+    for index, path in enumerate(input_data.changed_paths):
+        if len(path) > settings.max_character_mutation_path_length:
+            raise _CharacterMutationContractError(
+                reason=(
+                    "mutation path exceeds the configured maximum length of "
+                    f"{settings.max_character_mutation_path_length}."
+                ),
+                path=f"/changedPaths/{index}",
+            )
+        segments = parse_character_mutation_path(path)
+        if len(segments) > settings.max_character_mutation_path_segments:
+            raise _CharacterMutationContractError(
+                reason=(
+                    "mutation path exceeds the configured maximum segment count of "
+                    f"{settings.max_character_mutation_path_segments}."
+                ),
+                path=f"/changedPaths/{index}",
+            )
+
+    try:
+        validate_json_payload(
+            input_data.canonical_payload(),
+            max_depth=settings.max_json_depth,
+            max_string_bytes=settings.max_json_string_length,
+        )
+    except JsonPayloadValidationError as error:
+        raise _CharacterMutationContractError(
+            reason=str(error),
+            path=error.path,
+        ) from error
 
 
 async def find_character_mutation(
@@ -217,7 +288,7 @@ async def load_remote_changed_paths(
         .order_by(CharacterEvent.server_revision.asc(), CharacterEvent.id.asc())
     )
     events = list(result.scalars().all())
-    oldest_available_revision = await event_service.get_oldest_available_revision(
+    oldest_available_revision = await event_service.get_oldest_mergeable_revision(
         session,
         character_id=character_id,
     )
@@ -306,7 +377,7 @@ async def _persist_rejection(
     )
 
 
-def _existing_mutation_result(
+def resolve_existing_character_mutation(
     *,
     character: CloudCharacter,
     mutation: CharacterMutation,
@@ -389,28 +460,39 @@ async def apply_owner_character_mutation(
         mutation_id=input_data.mutation_id,
     )
     if existing is not None:
-        return _existing_mutation_result(
+        return resolve_existing_character_mutation(
             character=character,
             mutation=existing,
             input_data=input_data,
         )
 
     actual_request_bytes = _canonical_request_size(input_data)
-    if actual_request_bytes > settings.max_cloud_character_payload_bytes:
+    if actual_request_bytes > settings.max_character_mutation_payload_bytes:
         return await _persist_rejection(
             session,
             character=character,
             input_data=input_data,
             code="MUTATION_TOO_LARGE",
             reason="The encoded mutation exceeds the configured payload limit.",
-            max_bytes=settings.max_cloud_character_payload_bytes,
+            max_bytes=settings.max_character_mutation_payload_bytes,
             actual_bytes=actual_request_bytes,
+        )
+
+    try:
+        _validate_configured_mutation_contract(input_data, settings=settings)
+    except _CharacterMutationContractError as error:
+        return await _persist_rejection(
+            session,
+            character=character,
+            input_data=input_data,
+            code="INVALID_MUTATION",
+            reason=error.reason,
+            path=error.path,
         )
 
     if (
         input_data.schema_version != character.schema_version
-        or input_data.schema_version
-        != settings.supported_cloud_character_schema_version
+        or input_data.schema_version != settings.supported_cloud_character_schema_version
     ):
         return await _persist_rejection(
             session,

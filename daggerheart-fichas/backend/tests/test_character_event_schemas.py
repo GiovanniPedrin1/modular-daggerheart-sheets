@@ -382,3 +382,12 @@ def test_stream_position_requires_revision_or_cursor_and_prefers_cursor() -> Non
     )
     assert by_cursor.kind == "cursor"
     assert by_cursor.value == "1042"
+
+
+def test_stream_position_rejects_revision_outside_postgresql_integer_range() -> None:
+    from pydantic import ValidationError
+
+    from app.schemas.character_events import CharacterEventStreamPosition
+
+    with pytest.raises(ValidationError):
+        CharacterEventStreamPosition(sinceRevision=2_147_483_648)

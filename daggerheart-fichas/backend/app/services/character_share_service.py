@@ -63,6 +63,7 @@ class RevokeCharacterShareResult:
     share_id: UUID
     character_id: UUID
     revoked_at: datetime
+    target_user_id: UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -268,6 +269,7 @@ async def revoke_character_share(
     return RevokeCharacterShareResult(
         share_id=share.id,
         character_id=share.character_id,
+        target_user_id=share.target_user_id,
         revoked_at=revocation_time,
     )
 

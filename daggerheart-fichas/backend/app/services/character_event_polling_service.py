@@ -13,8 +13,13 @@ from app.services import character_stream_access_service as access_service
 
 type SessionFactory = Callable[[], AsyncSession]
 type DisconnectCheck = Callable[[], Awaitable[bool]]
+type StopCheck = Callable[[], bool]
 type Sleep = Callable[[float], Awaitable[None]]
 type Clock = Callable[[], float]
+
+
+class CharacterEventPollDatabaseTimeoutError(RuntimeError):
+    """A bounded database operation did not finish before the stream deadline."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +37,20 @@ def _require_positive_interval(value: float, *, name: str) -> float:
     return value
 
 
+async def _await_database_operation[T](
+    operation: Awaitable[T],
+    *,
+    timeout_seconds: float,
+) -> T:
+    try:
+        async with asyncio.timeout(timeout_seconds):
+            return await operation
+    except TimeoutError as error:
+        raise CharacterEventPollDatabaseTimeoutError(
+            "character event database operation timed out"
+        ) from error
+
+
 async def poll_character_events(
     *,
     access: access_service.CharacterStreamAccess,
@@ -39,7 +58,9 @@ async def poll_character_events(
     limit: int,
     poll_interval_seconds: float,
     access_recheck_seconds: float,
+    query_timeout_seconds: float = 5.0,
     is_disconnected: DisconnectCheck,
+    should_stop: StopCheck | None = None,
     session_factory: SessionFactory = AsyncSessionLocal,
     sleep: Sleep = asyncio.sleep,
     clock: Clock = monotonic,
@@ -51,7 +72,9 @@ async def poll_character_events(
     Empty polls wait for the configured interval, while pages with more rows are
     drained without sleeping. Authorization is checked after querying events so a
     persisted terminal event can be delivered before the connection is closed.
-    No transaction or session is kept alive between polls.
+    Database operations are bounded so a stuck pool or query cannot hold an SSE
+    task and its connection lease indefinitely. No transaction or session is kept
+    alive between polls.
     """
 
     interval = _require_positive_interval(
@@ -62,37 +85,52 @@ async def poll_character_events(
         access_recheck_seconds,
         name="access_recheck_seconds",
     )
+    query_timeout = _require_positive_interval(
+        query_timeout_seconds,
+        name="query_timeout_seconds",
+    )
     if after_event_id < 0:
         raise ValueError("after_event_id cannot be negative")
     if limit < 1:
         raise ValueError("limit must be greater than zero")
 
+    stop = should_stop or (lambda: False)
     cursor = after_event_id
     delay_before_next_poll = 0.0
     next_access_recheck = clock() + recheck_interval
 
     while True:
+        if stop():
+            return
         if delay_before_next_poll > 0:
             await sleep(delay_before_next_poll)
+        if stop():
+            return
 
         if await is_disconnected():
             return
 
         async with session_factory() as session:
             if access.role == "owner":
-                page = await event_service.list_character_content_events_after_position(
-                    session,
-                    character_id=access.character_id,
-                    after_event_id=cursor,
-                    limit=limit,
+                page = await _await_database_operation(
+                    event_service.list_character_content_events_after_position(
+                        session,
+                        character_id=access.character_id,
+                        after_event_id=cursor,
+                        limit=limit,
+                    ),
+                    timeout_seconds=query_timeout,
                 )
             else:
-                page = await event_service.list_character_events_after_position(
-                    session,
-                    character_id=access.character_id,
-                    viewer_user_id=access.user_id,
-                    after_event_id=cursor,
-                    limit=limit,
+                page = await _await_database_operation(
+                    event_service.list_character_events_after_position(
+                        session,
+                        character_id=access.character_id,
+                        viewer_user_id=access.user_id,
+                        after_event_id=cursor,
+                        limit=limit,
+                    ),
+                    timeout_seconds=query_timeout,
                 )
 
         if page.last_event_id is not None:
@@ -102,9 +140,12 @@ async def poll_character_events(
         access_active = True
         if not page.has_more and now >= next_access_recheck:
             async with session_factory() as session:
-                access_active = await access_service.is_character_stream_access_active(
-                    session,
-                    access=access,
+                access_active = await _await_database_operation(
+                    access_service.is_character_stream_access_active(
+                        session,
+                        access=access,
+                    ),
+                    timeout_seconds=query_timeout,
                 )
             next_access_recheck = now + recheck_interval
 

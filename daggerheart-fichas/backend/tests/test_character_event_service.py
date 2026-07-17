@@ -192,7 +192,7 @@ async def test_history_state_returns_revision_bounds_and_count() -> None:
     assert state.newest_available_revision == 5
     assert state.available_revision_count == 3
     sql = str(session.execute.await_args.args[0])
-    assert "character_events.event_type IN" in sql
+    assert "character_events.snapshot IS NOT NULL" in sql
     assert "character_events.server_revision >" in sql
     assert "character_events.server_revision <=" in sql
 
@@ -276,7 +276,7 @@ async def test_list_content_events_since_revision_is_ordered_and_paginated(monke
     assert page.last_event_id == 11
     statement = session.execute.await_args.args[0]
     sql = str(statement)
-    assert "character_events.event_type IN" in sql
+    assert "character_events.snapshot IS NOT NULL" in sql
     assert "share_revoked" not in sql
     assert statement._limit_clause is not None
 
@@ -322,7 +322,7 @@ async def test_cursor_availability_is_scoped_to_character_and_viewer() -> None:
     assert "character_events.id =" in sql
     assert "character_events.character_id =" in sql
     assert "character_events.audience_user_id =" in sql
-    assert "character_events.event_type IN" in sql
+    assert "character_events.snapshot IS NOT NULL" in sql
 
 
 @pytest.mark.asyncio
@@ -385,13 +385,51 @@ async def test_cursor_replay_includes_general_and_targeted_events(monkeypatch) -
 
 
 @pytest.mark.asyncio
-async def test_retention_deletes_old_events_but_keeps_recent_content_revisions() -> None:
+async def test_compaction_replaces_expired_snapshot_with_path_only_marker() -> None:
+    session = make_session()
+    session.execute.return_value = SimpleNamespace(rowcount=6)
+    settings = Settings(
+        app_env="test",
+        character_event_retention_days=30,
+        character_event_retention_revisions=500,
+    )
+    character_id = uuid4()
+
+    compacted = await service.compact_expired_character_events(
+        session,
+        settings=settings,
+        now=datetime(2026, 7, 11, 12, 0, tzinfo=UTC),
+        character_id=character_id,
+    )
+
+    assert compacted == 6
+    statement = session.execute.await_args.args[0]
+    sql = str(statement)
+    assert "UPDATE character_events SET snapshot=" in sql
+    assert "row_number() OVER" in sql
+    assert "character_events.snapshot IS NOT NULL" in sql
+    assert "character_events.changed_paths IS NOT NULL" in sql
+    assert "character_events.character_id =" in sql
+    assert (
+        statement._values[CharacterEvent.__table__.c.patch].value
+        == service.COMPACTED_EVENT_PATCH
+    )
+    assert (
+        statement._values[CharacterEvent.__table__.c.compacted_at].value
+        == datetime(2026, 7, 11, 12, 0, tzinfo=UTC)
+    )
+
+
+@pytest.mark.asyncio
+async def test_retention_deletes_expired_replay_and_compacted_events() -> None:
     session = make_session()
     session.execute.return_value = SimpleNamespace(rowcount=7)
     settings = Settings(
         app_env="test",
         character_event_retention_days=30,
         character_event_retention_revisions=500,
+        character_event_compaction_retention_days=90,
+        character_event_compaction_retention_revisions=2_000,
     )
     character_id = uuid4()
 
@@ -406,8 +444,9 @@ async def test_retention_deletes_old_events_but_keeps_recent_content_revisions()
     statement = session.execute.await_args.args[0]
     sql = str(statement)
     assert "DELETE FROM character_events" in sql
-    assert "row_number() OVER" in sql
+    assert sql.count("row_number() OVER") == 2
     assert "character_events.created_at <" in sql
+    assert "character_events.patch IS NOT NULL" in sql
     assert "character_events.character_id =" in sql
 
 
@@ -426,6 +465,8 @@ async def test_retention_rejects_naive_clock() -> None:
     [
         "character_event_retention_days",
         "character_event_retention_revisions",
+        "character_event_compaction_retention_days",
+        "character_event_compaction_retention_revisions",
         "character_event_replay_batch_size",
     ],
 )
@@ -491,10 +532,14 @@ async def test_prune_character_events_returns_operational_summary(monkeypatch) -
         app_env="test",
         character_event_retention_days=14,
         character_event_retention_revisions=250,
+        character_event_compaction_retention_days=60,
+        character_event_compaction_retention_revisions=1_000,
     )
     current_time = datetime(2026, 7, 11, 12, 0, tzinfo=UTC)
     character_id = uuid4()
+    compact_events = AsyncMock(return_value=12)
     delete_events = AsyncMock(return_value=9)
+    monkeypatch.setattr(service, "compact_expired_character_events", compact_events)
     monkeypatch.setattr(service, "delete_expired_character_events", delete_events)
 
     result = await service.prune_character_events(
@@ -504,14 +549,50 @@ async def test_prune_character_events_returns_operational_summary(monkeypatch) -
         character_id=character_id,
     )
 
+    assert result.compacted_count == 12
     assert result.deleted_count == 9
     assert result.cutoff == datetime(2026, 6, 27, 12, 0, tzinfo=UTC)
     assert result.retention_days == 14
     assert result.retained_content_revisions == 250
+    assert result.compaction_cutoff == datetime(2026, 5, 12, 12, 0, tzinfo=UTC)
+    assert result.compaction_retention_days == 60
+    assert result.retained_compacted_revisions == 1_000
     assert result.character_id == character_id
+    compact_events.assert_awaited_once_with(
+        session,
+        settings=settings,
+        now=current_time,
+        character_id=character_id,
+    )
     delete_events.assert_awaited_once_with(
         session,
         settings=settings,
         now=current_time,
         character_id=character_id,
     )
+
+
+def test_compacted_event_marker_is_detected_without_exposing_snapshot() -> None:
+    event = make_event(42)
+    event.snapshot = None
+    event.patch = dict(service.COMPACTED_EVENT_PATCH)
+    event.compacted_at = now()
+    event.changed_paths = ["/data/hp_current"]
+
+    assert service.is_compacted_character_event(event) is True
+
+
+def test_compaction_window_cannot_be_shorter_than_replay_window() -> None:
+    with pytest.raises(ValidationError, match="COMPACTION_RETENTION_DAYS"):
+        Settings(
+            app_env="test",
+            character_event_retention_days=30,
+            character_event_compaction_retention_days=29,
+        )
+
+    with pytest.raises(ValidationError, match="COMPACTION_RETENTION_REVISIONS"):
+        Settings(
+            app_env="test",
+            character_event_retention_revisions=500,
+            character_event_compaction_retention_revisions=499,
+        )

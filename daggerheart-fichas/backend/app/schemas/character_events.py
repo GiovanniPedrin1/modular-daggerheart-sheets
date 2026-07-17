@@ -12,6 +12,7 @@ from app.core.character_mutation_paths import (
     find_intersecting_character_mutation_paths,
     normalize_character_mutation_path,
 )
+from app.core.security_contracts import MAX_CHARACTER_SERVER_REVISION
 from app.models.character_event import CharacterEvent
 from app.models.cloud_character import CloudCharacter
 from app.schemas.characters import (
@@ -337,9 +338,7 @@ class CharacterUpdatedEventCreate(CharacterEventCreateSchema):
         intersections = find_intersecting_character_mutation_paths(normalized)
         if intersections:
             left, right = intersections[0]
-            raise ValueError(
-                f"changedPaths must not overlap: {left} intersects {right}"
-            )
+            raise ValueError(f"changedPaths must not overlap: {left} intersects {right}")
         return normalized
 
     def to_model(self) -> CharacterEvent:
@@ -348,9 +347,7 @@ class CharacterUpdatedEventCreate(CharacterEventCreateSchema):
             server_revision=self.server_revision,
             event_type="updated",
             snapshot=self.snapshot.model_dump(by_alias=True, mode="json"),
-            changed_paths=(
-                list(self.changed_paths) if self.changed_paths is not None else None
-            ),
+            changed_paths=(list(self.changed_paths) if self.changed_paths is not None else None),
             actor_user_id=self.actor_user_id,
             device_id=self.device_id,
         )
@@ -408,7 +405,12 @@ class CharacterShareRevokedEventCreate(CharacterEventCreateSchema):
 class CharacterEventStreamPosition(CharacterEventSchema):
     """Validated stream start position with Last-Event-ID precedence."""
 
-    since_revision: int | None = Field(default=None, ge=1, alias="sinceRevision")
+    since_revision: int | None = Field(
+        default=None,
+        ge=1,
+        le=MAX_CHARACTER_SERVER_REVISION,
+        alias="sinceRevision",
+    )
     last_event_id: str | None = Field(default=None, alias="lastEventId")
 
     @field_validator("last_event_id")

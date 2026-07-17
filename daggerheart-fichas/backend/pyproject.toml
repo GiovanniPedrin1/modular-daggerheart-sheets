@@ -1,7 +1,11 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "daggerheart-fichas-api"
-version = "0.3.0"
-description = "Backend FastAPI para login e backup manual do Daggerheart Fichas."
+version = "0.4.11"
+description = "Backend FastAPI para fichas cloud, compartilhamento e sincronização do Daggerheart Fichas."
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115.0,<1.0.0",
@@ -13,10 +17,15 @@ dependencies = [
   "argon2-cffi>=23.1.0,<24.0.0",
   "python-dotenv>=1.0.1,<2.0.0",
   "alembic>=1.14.0,<2.0.0",
+  "redis>=5.2.0,<6.0.0",
 ]
 
 [project.scripts]
 prune-character-events = "app.commands.prune_character_events:main"
+maintain-data-lifecycle = "app.commands.maintain_data_lifecycle:main"
+check-release-readiness = "app.commands.check_release_readiness:main"
+security-smoke-test = "app.commands.security_smoke_test:main"
+load-smoke-test = "app.commands.load_smoke_test:main"
 
 [project.optional-dependencies]
 dev = [
@@ -37,6 +46,11 @@ ignore = []
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+  "postgres: requires TEST_DATABASE_URL pointing to an isolated PostgreSQL database",
+  "security: security regression and deployment smoke coverage",
+  "load: bounded load-test harness coverage",
+]
 
 [tool.setuptools.packages.find]
 include = ["app*"]

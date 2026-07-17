@@ -13,6 +13,7 @@ def test_auth_routes_are_registered() -> None:
     assert "/auth/register" in paths
     assert "/auth/login" in paths
     assert "/auth/refresh" in paths
+    assert "/auth/csrf" in paths
     assert "/auth/me" in paths
     assert "/auth/logout" in paths
     assert "/backups" in paths

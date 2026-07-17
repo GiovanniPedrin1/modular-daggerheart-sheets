@@ -1,0 +1,182 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build:check
+
+  backend-unit-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.8.0"
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --frozen --extra dev
+      - run: uv run ruff check app tests
+      - run: uv run pytest -q -m "not postgres"
+      - run: uv run pytest -q -m security
+      - run: uv run check-release-readiness --skip-database --skip-rate-limit --pretty
+
+  backend-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: daggerheart_test
+          POSTGRES_USER: daggerheart
+          POSTGRES_PASSWORD: daggerheart
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U daggerheart -d daggerheart_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      APP_ENV: staging
+      DATABASE_URL: postgresql+asyncpg://daggerheart:daggerheart@localhost:5432/daggerheart_test
+      TEST_DATABASE_URL: postgresql+asyncpg://daggerheart:daggerheart@localhost:5432/daggerheart_test
+      SESSION_SECRET: ci-session-secret-that-is-long-and-not-used-anywhere-else
+      CORS_ALLOWED_ORIGINS: '["http://localhost:5173"]'
+      TRUSTED_HOSTS: '["localhost","127.0.0.1"]'
+      CSRF_ENABLED: "true"
+      AUDIT_ENABLED: "true"
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_STORAGE_URL: redis://localhost:6379/0
+      METRICS_ENABLED: "true"
+      METRICS_BEARER_TOKEN: ci-metrics-token-that-is-at-least-thirty-two-characters
+      API_DOCS_ENABLED: "false"
+      RELEASE_REVISION: ${{ github.sha }}
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.8.0"
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --frozen --extra dev
+      - run: uv run alembic upgrade head
+      - run: uv run pytest -q -m postgres
+      - run: uv run check-release-readiness --pretty
+
+  deployment-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      APP_ENV: staging
+      SESSION_SECRET: ci-smoke-session-secret-that-is-long-and-unique
+      DATABASE_URL: postgresql+asyncpg://daggerheart:daggerheart@localhost:5432/unused
+      CORS_ALLOWED_ORIGINS: '["http://localhost:5173"]'
+      TRUSTED_HOSTS: '["localhost","127.0.0.1"]'
+      CSRF_ENABLED: "true"
+      AUDIT_ENABLED: "false"
+      API_DOCS_ENABLED: "false"
+      SECURITY_HEADERS_ENABLED: "true"
+      METRICS_ENABLED: "false"
+      RELEASE_REVISION: ${{ github.sha }}
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.8.0"
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --frozen --extra dev
+      - name: Start API
+        run: |
+          uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/api.log 2>&1 &
+          echo $! > /tmp/api.pid
+          for attempt in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:8000/health >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/api.log
+          exit 1
+      - name: Security smoke
+        run: >-
+          uv run security-smoke-test
+          --base-url http://127.0.0.1:8000
+          --trusted-origin http://localhost:5173
+          --expected-host 127.0.0.1:8000
+          --expect-docs-disabled
+          --pretty
+      - name: Bounded load smoke
+        run: >-
+          uv run load-smoke-test
+          --base-url http://127.0.0.1:8000
+          --requests 200
+          --concurrency 20
+          --max-error-rate 0
+          --max-p95-ms 500
+          --min-rps 10
+          --pretty
+      - if: always()
+        run: |
+          test -f /tmp/api.pid && kill $(cat /tmp/api.pid) || true
+          cat /tmp/api.log || true
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e

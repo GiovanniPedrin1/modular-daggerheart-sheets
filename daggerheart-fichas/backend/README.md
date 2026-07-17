@@ -42,11 +42,16 @@ Para criar novas migrations no futuro:
 alembic revision --autogenerate -m "describe change"
 ```
 
-Tabelas iniciais:
+Tabelas principais:
 
 - `users`
 - `refresh_sessions`
 - `cloud_backups`
+- `cloud_characters`
+- `character_shares`
+- `character_events`
+- `character_mutations`
+- `audit_events`
 
 ## Rodar API
 
@@ -61,6 +66,7 @@ Endpoints iniciais:
 - `POST /auth/register`
 - `POST /auth/login`
 - `POST /auth/refresh`
+- `GET /auth/csrf`
 - `GET /auth/me`
 - `POST /auth/logout`
 
@@ -68,6 +74,7 @@ Exemplo de cadastro local:
 
 ```bash
 curl -i -X POST http://localhost:8000/auth/register \
+  -H "Origin: http://localhost:5173" \
   -H "Content-Type: application/json" \
   -d '{"email":"tester@example.com","password":"senha-segura-123","displayName":"Tester"}'
 ```
@@ -78,9 +85,18 @@ A dependência `argon2-cffi` está instalada e `app/core/security.py` expõe hel
 
 As sessões usam refresh token opaco em cookie `HttpOnly`, `SameSite=Lax` e `Secure` em produção. O banco armazena apenas o hash HMAC-SHA256 do token de sessão, não o token em texto puro. Defina `SESSION_SECRET` com um valor longo e aleatório antes de staging/produção.
 
+## Cookies, CORS e headers HTTP
+
+Em produção, os cookies de sessão e CSRF usam automaticamente o prefixo `__Host-`, são
+`HttpOnly`, `Secure`, host-only e `Path=/`. O backend valida o header `Host` com `TRUSTED_HOSTS`,
+usa uma lista explícita de headers CORS e adiciona CSP, proteção contra framing, `nosniff`,
+`Referrer-Policy`, `Permissions-Policy` e HSTS. A documentação OpenAPI fica desativada por padrão
+em produção. Consulte `docs/phase-6-cookies-cors-http-headers.md` antes de configurar domínios,
+`SameSite=None`, preload de HSTS ou um proxy reverso.
+
 ## Cloud backup endpoints
 
-The initial manual cloud-backup API is protected by the refresh-session cookie created by `/auth/login` or `/auth/register`.
+The initial manual cloud-backup API is protected by the refresh-session cookie created by `/auth/login` or `/auth/register`. With CSRF enabled, mutating requests must also send the token returned by `GET /auth/csrf` in the configured `X-CSRF-Token` header.
 
 Available endpoints:
 
@@ -96,7 +112,8 @@ DELETE /backups/{backup_id}
 
 - the cloud backup format version;
 - the wrapped local backup format version;
-- maximum payload size;
+- maximum wire and canonical payload size;
+- bounded JSON depth and UTF-8 string/key sizes;
 - checksum ownership and integrity by recalculating SHA-256 over the normalized local payload;
 - authenticated ownership for list/read/delete operations.
 
@@ -127,15 +144,41 @@ O frontend usa `credentials: include`, então mantenha `CORS_ALLOWED_ORIGINS` co
 - optimistic revision checks for snapshot replacement;
 - no revision increment for unchanged content;
 - soft delete through `deleted_at`;
-- payload-size and supported-schema validation.
+- wire/canonical payload-size, JSON-structure, identifier and supported-schema validation.
 
-The service calls `flush()` but leaves the normal transaction `commit()` to the HTTP endpoint. The only internal rollback occurs when recovering from a concurrent unique-index race during publication.
+Cloud snapshot create/update/delete operations leave the normal transaction `commit()` to the HTTP endpoint. Owner mutations use `character_mutation_transaction_service`, which commits character, idempotency row and content event together and performs bounded concurrency retries.
+
+
+## Payload hardening
+
+Every HTTP body is bounded by `MAX_REQUEST_BODY_BYTES` before normal endpoint processing.
+Backups, cloud-character snapshots and mutations also have smaller feature-specific limits.
+JSON depth and UTF-8 string/key size are validated without echoing rejected values. Mutation
+operation/path counts, path length/segments, device IDs, share targets and revision ranges are
+checked before persistence. See `docs/phase-6-payload-limits-validation.md` for the complete
+error contract and boundary rules.
+
+## Rate limiting
+
+Ative `RATE_LIMIT_ENABLED=true` para limitar autenticação, leituras, escritas, compartilhamento,
+mutations e conexões SSE. Em staging/produção configure Redis compartilhado:
+
+```env
+RATE_LIMIT_STORAGE_URL=redis://localhost:6379/0
+```
+
+Rejeições retornam `429 RATE_LIMITED` com `Retry-After`. O frontend respeita esse atraso ao
+reagendar a `syncQueue`. Desenvolvimento e testes podem usar o store em memória. Veja
+`docs/phase-6-rate-limiting.md`.
 
 ## Character event retention
 
 Realtime character events are stored in PostgreSQL so SSE replay works across server restarts
-and multiple workers. The default policy keeps all events for 30 days and also preserves the
-latest 500 content revisions per character.
+and multiple workers. The default public replay policy keeps snapshots for 30 days and at least
+the latest 500 content revisions per character. Older update snapshots with exact `changed_paths`
+are compacted in place to a small path-only row, so owner mutation merge checks can remain safe
+without retaining the full character JSON. Those compacted rows use a longer 90-day / 2,000-revision
+window.
 
 Run the retention job from the `backend` directory:
 
@@ -151,8 +194,149 @@ It can be scheduled daily by the deployment platform. Configure the policy with:
 ```env
 CHARACTER_EVENT_RETENTION_DAYS=30
 CHARACTER_EVENT_RETENTION_REVISIONS=500
+CHARACTER_EVENT_COMPACTION_RETENTION_DAYS=90
+CHARACTER_EVENT_COMPACTION_RETENTION_REVISIONS=2000
 ```
 
-When a viewer reconnects from a revision or cursor that is no longer replayable, the SSE
-endpoint sends `character.full_resync_required`. The client must fetch the current shared
-snapshot and reconnect from its `serverRevision`.
+When a viewer reconnects from a revision or cursor whose snapshot was compacted or removed, the
+SSE endpoint sends `character.full_resync_required`. The client must fetch the current shared
+snapshot and reconnect from its `serverRevision`. Compacted rows are never serialized to SSE; they
+exist only for server-side merge safety. See `docs/phase-6-character-event-retention-compaction.md`.
+
+## SSE em produção
+
+Os streams do dono e do viewer agora usam heartbeat, replay por `Last-Event-ID`, timeout de
+consulta, timeout de escrita para clientes/proxies lentos e rotação periódica com jitter. Cada
+conexão recebe uma diretiva `retry`, e o navegador reconecta automaticamente sem alterar o último
+cursor persistido. O backend também rejeita novas conexões durante drain e tenta aguardar as
+conexões ativas no encerramento do processo.
+
+Os headers desativam cache, transformação, compressão e buffering do Nginx. Não é enviado o header
+hop-by-hop `Connection`, mantendo compatibilidade com HTTP/2. Configure o proxy para não fazer
+buffering nem gzip em `text/event-stream`, e use um graceful shutdown maior que
+`CHARACTER_EVENT_SHUTDOWN_GRACE_SECONDS`. Exemplo de parâmetros: 
+
+```env
+CHARACTER_EVENT_QUERY_TIMEOUT_SECONDS=5
+CHARACTER_EVENT_SEND_TIMEOUT_SECONDS=10
+CHARACTER_EVENT_STREAM_MAX_DURATION_SECONDS=300
+CHARACTER_EVENT_STREAM_ROTATION_JITTER_SECONDS=30
+CHARACTER_EVENT_SHUTDOWN_GRACE_SECONDS=15
+CHARACTER_EVENT_RETRY_MILLISECONDS=3000
+```
+
+Veja `docs/phase-6-sse-production-hardening.md` para configuração de proxy, deploy e critérios de
+monitoramento.
+
+## Contrato central de segurança — Fase 6
+
+As configurações de limites, request IDs, CSRF, rate limiting, auditoria e retenção ficam
+centralizadas em `app/core/config.py`. Os máximos absolutos revisados ficam em
+`app/core/security_contracts.py`; variáveis de ambiente podem reduzir esses limites, mas não
+ultrapassá-los.
+
+Toda resposta HTTP inclui `X-Request-ID`. O backend aceita um ID seguro enviado por proxy ou
+frontend e gera `req_<uuid>` quando ele estiver ausente ou inválido. O header é exposto no CORS e
+já é lido pelo `ApiClientError.requestId` do frontend.
+
+Erros JSON seguem o contrato estável `{ code, message, detail }`. Falhas de validação são
+sanitizadas e limitadas; falhas inesperadas retornam uma mensagem genérica sem texto de exceção.
+Veja `docs/phase-6-security-configuration-contract.md` e `backend/.env.example` para o catálogo
+completo.
+
+Em produção, o startup rejeita secret padrão, origens CORS/CSRF não HTTPS ou wildcard, cookie de
+sessão explicitamente inseguro e `CSRF_ENABLED=false`. A proteção CSRF usa origem confiável mais
+token ligado à sessão; veja `docs/phase-6-csrf-protection.md`. Rate limiting já protege autenticação,
+leituras, mutations, shares e conexões SSE, com Redis compartilhado fora de desenvolvimento; veja
+`docs/phase-6-rate-limiting.md`. A auditoria de ações sensíveis é persistida em
+`audit_events`; veja `docs/phase-6-sensitive-action-auditing.md`.
+
+## Concorrência e idempotência de mutations
+
+Mutations do dono agora são aplicadas por uma fronteira transacional única: ficha, registro de
+idempotência e evento de revisão são confirmados juntos. A linha de `cloud_characters` é bloqueada
+antes de qualquer linha dependente, mantendo uma ordem de locks consistente entre mutation,
+snapshot legado, deleção e revogação de share.
+
+Falhas PostgreSQL transitórias (`40001`, `40P01`, `55P03`) e confirmações de COMMIT ambíguas são
+repetidas de forma limitada com o mesmo `deviceId`/`mutationId`. Ao esgotar as tentativas, a API
+retorna `503 CHARACTER_WRITE_BUSY` com `Retry-After`; o worker frontend mantém a mutation na fila.
+Veja `docs/phase-6-concurrency-idempotency.md`.
+
+Os testes concorrentes reais são opcionais e exigem um banco descartável:
+
+```bash
+TEST_DATABASE_URL=postgresql+asyncpg://daggerheart:daggerheart@localhost:5432/daggerheart_fichas \
+  uv run --extra dev pytest -m postgres -q
+```
+
+
+## Auditoria de ações sensíveis
+
+Com `AUDIT_ENABLED=true`, alterações de autenticação, backups, fichas cloud, mutations e shares
+geram registros minimizados em `audit_events`. A auditoria é adicionada à mesma transação da
+ação, não armazena conteúdo da ficha, e usa `X-Request-ID` para correlação. IP é opcional e pode
+ser omitido, truncado ou transformado por HMAC; o User-Agent é limitado. Produção exige auditoria
+ativa. Veja `docs/phase-6-sensitive-action-auditing.md`.
+## Privacidade e ciclo de vida dos dados
+
+Dados inativos são removidos por um job separado e limitado por batch. O job apaga tombstones de
+fichas, convites pendentes expirados, shares revogados, sessões antigas e auditorias fora da
+retenção. Fichas ativas, shares ativos e backups manuais não são selecionados.
+
+Antes de ativar o scheduler, inspecione o resultado:
+
+```bash
+maintain-data-lifecycle --dry-run
+maintain-data-lifecycle
+```
+
+Configure os períodos com `CLOUD_CHARACTER_TOMBSTONE_RETENTION_DAYS`,
+`PENDING_SHARE_RETENTION_DAYS`, `REVOKED_SHARE_RETENTION_DAYS`,
+`REFRESH_SESSION_RETENTION_DAYS`, `AUDIT_RETENTION_DAYS` e
+`DATA_LIFECYCLE_BATCH_SIZE`. Respostas autenticadas e de fichas usam `no-store`, e o frontend não
+persiste snapshots de viewer no IndexedDB. Veja `docs/phase-6-data-privacy-lifecycle.md`.
+
+## Logs estruturados e métricas
+
+A API emite logs JSON de uma linha com `event`, `level`, `timestamp` e `requestId`.
+Os campos são limitados e chaves sensíveis como senha, token, cookie, payload, snapshot e
+operations são removidas. Tracebacks ficam desativados por padrão; falhas inesperadas registram
+apenas o tipo da exceção e continuam retornando um erro público genérico.
+
+Ative métricas Prometheus com:
+
+```env
+METRICS_ENABLED=true
+METRICS_BEARER_TOKEN=um-token-aleatorio-com-pelo-menos-32-caracteres
+```
+
+Em produção, o token é obrigatório. O scraper usa:
+
+```bash
+curl -H "Authorization: Bearer $METRICS_BEARER_TOKEN" http://localhost:8000/metrics
+```
+
+As métricas usam somente labels de baixa cardinalidade: método, template de rota, classe de
+status, código de erro, política, resultado e papel owner/viewer. IDs de usuário, ficha,
+dispositivo, mutation e request nunca viram labels. São medidos requests, latência, erros,
+rejeições de payload/CSRF/rate limit, mutations, retries PostgreSQL, SSE, full resync e auditorias
+enfileiradas na transação. Veja `docs/phase-6-structured-logging-metrics.md`.
+
+
+## Release gates, security smoke and load smoke
+
+Before promoting a staging or production image, run:
+
+```bash
+check-release-readiness --pretty
+security-smoke-test --base-url https://api.example.com \
+  --trusted-origin https://app.example.com --expected-host api.example.com \
+  --require-hsts --expect-docs-disabled --pretty
+load-smoke-test --base-url https://api.example.com --requests 1000 \
+  --concurrency 50 --max-error-rate 0.01 --max-p95-ms 500 --pretty
+```
+
+The rollout kill switches can pause snapshot writes, owner mutations, sharing writes or SSE while
+keeping cloud reads available. See `docs/phase-6-security-load-rollout.md` for the canary sequence,
+thresholds and rollback checklist.

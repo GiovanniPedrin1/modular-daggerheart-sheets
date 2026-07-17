@@ -3,10 +3,11 @@ from __future__ import annotations
 from typing import NoReturn
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 
 from app.api.dependencies import CurrentUser, DbSession
 from app.api.errors import api_error
+from app.api.rate_limits import enforce_user_read_rate_limit
 from app.schemas.shares import (
     GetSharedCharacterResponse,
     ListSharedCharactersResponse,
@@ -52,7 +53,11 @@ def raise_shared_character_api_error(
     raise error
 
 
-@router.get("", response_model=ListSharedCharactersResponse)
+@router.get(
+    "",
+    response_model=ListSharedCharactersResponse,
+    dependencies=[Depends(enforce_user_read_rate_limit)],
+)
 async def list_shared_characters(
     session: DbSession,
     current_user: CurrentUser,
@@ -69,6 +74,7 @@ async def list_shared_characters(
 @router.get(
     "/{character_id}",
     response_model=GetSharedCharacterResponse,
+    dependencies=[Depends(enforce_user_read_rate_limit)],
     responses={
         status.HTTP_404_NOT_FOUND: {
             "description": (

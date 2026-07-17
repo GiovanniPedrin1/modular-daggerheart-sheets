@@ -125,7 +125,7 @@ async def test_mutation_patch_emits_event_and_commits_applied_change(monkeypatch
         apply_mock,
     )
     monkeypatch.setattr(
-        routes.event_service,
+        routes.mutation_transaction_service.event_service,
         "append_character_updated_event",
         append_mock,
     )
@@ -136,6 +136,7 @@ async def test_mutation_patch_emits_event_and_commits_applied_change(monkeypatch
         session=session,
         settings=Settings(app_env="test"),
         current_user=owner,
+        request=SimpleNamespace(state=SimpleNamespace(request_body_bytes=0)),
     )
 
     assert response.result == "applied"
@@ -254,7 +255,7 @@ async def test_mutation_patch_does_not_emit_event_for_unchanged_or_duplicate(
     )
     append_mock = AsyncMock()
     monkeypatch.setattr(
-        routes.event_service,
+        routes.mutation_transaction_service.event_service,
         "append_character_updated_event",
         append_mock,
     )
@@ -265,6 +266,7 @@ async def test_mutation_patch_does_not_emit_event_for_unchanged_or_duplicate(
         session=session,
         settings=Settings(app_env="test"),
         current_user=owner,
+        request=SimpleNamespace(state=SimpleNamespace(request_body_bytes=0)),
     )
 
     assert response.result == expected_result
@@ -310,13 +312,12 @@ async def test_mutation_patch_commits_conflict_record_before_returning_409(monke
             session=session,
             settings=Settings(app_env="test"),
             current_user=owner,
+            request=SimpleNamespace(state=SimpleNamespace(request_body_bytes=0)),
         )
 
     assert exc_info.value.status_code == status.HTTP_409_CONFLICT
     assert exc_info.value.detail["code"] == "SYNC_CONFLICT"
-    assert exc_info.value.detail["detail"]["conflictingPaths"] == [
-        "/data/detailsPage/story"
-    ]
+    assert exc_info.value.detail["detail"]["conflictingPaths"] == ["/data/detailsPage/story"]
     session.commit.assert_awaited_once()
     session.refresh.assert_not_awaited()
 
@@ -352,6 +353,7 @@ async def test_mutation_patch_translates_persisted_client_ahead_rejection(monkey
             session=session,
             settings=Settings(app_env="test"),
             current_user=owner,
+            request=SimpleNamespace(state=SimpleNamespace(request_body_bytes=0)),
         )
 
     assert exc_info.value.status_code == status.HTTP_409_CONFLICT
@@ -391,3 +393,21 @@ def test_idempotency_key_reuse_is_exposed_as_mutation_rejected() -> None:
     assert exc_info.value.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     assert exc_info.value.detail["code"] == "MUTATION_REJECTED"
     assert exc_info.value.detail["detail"]["mutationId"] == str(input_data.mutation_id)
+
+
+def test_character_write_busy_is_exposed_as_retryable_503() -> None:
+    error = routes.mutation_transaction_service.CharacterWriteBusyError(
+        attempts=3,
+        retry_after_seconds=2,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        routes.raise_character_mutation_transaction_error(error)
+
+    assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    assert exc_info.value.detail == {
+        "code": "CHARACTER_WRITE_BUSY",
+        "message": "The character is temporarily busy. Retry the same mutation shortly.",
+        "detail": {"attempts": 3},
+    }
+    assert exc_info.value.headers == {"Retry-After": "2"}

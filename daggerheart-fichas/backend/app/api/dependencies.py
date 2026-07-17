@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import Depends, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import clear_refresh_cookie, get_active_refresh_session
+from app.api.auth import clear_session_cookies, get_active_refresh_session
 from app.api.errors import api_error
 from app.core.config import Settings, get_settings
 from app.db.session import get_db_session
@@ -24,11 +24,11 @@ async def require_current_user(
     active_session = await get_active_refresh_session(
         session,
         settings=settings,
-        token=request.cookies.get(settings.session_cookie_name),
+        token=request.cookies.get(settings.effective_session_cookie_name),
     )
 
     if active_session is None:
-        clear_refresh_cookie(response, settings=settings)
+        clear_session_cookies(response, settings=settings)
         cookie_header = response.headers.get("set-cookie")
         raise api_error(
             status.HTTP_401_UNAUTHORIZED,

@@ -37,10 +37,14 @@ async def test_run_retention_commits_and_returns_summary(monkeypatch) -> None:
     current_time = datetime(2026, 7, 11, 12, 0, tzinfo=UTC)
     character_id = uuid4()
     expected = CharacterEventRetentionResult(
+        compacted_count=11,
         deleted_count=7,
         cutoff=datetime(2026, 6, 11, 12, 0, tzinfo=UTC),
         retention_days=30,
         retained_content_revisions=500,
+        compaction_cutoff=datetime(2026, 4, 12, 12, 0, tzinfo=UTC),
+        compaction_retention_days=90,
+        retained_compacted_revisions=2_000,
         character_id=character_id,
     )
     prune = AsyncMock(return_value=expected)
@@ -87,18 +91,26 @@ async def test_run_retention_rolls_back_on_failure(monkeypatch) -> None:
 def test_retention_command_payload_is_machine_readable() -> None:
     character_id = uuid4()
     result = CharacterEventRetentionResult(
+        compacted_count=8,
         deleted_count=3,
         cutoff=datetime(2026, 6, 11, 12, 0, tzinfo=UTC),
         retention_days=30,
         retained_content_revisions=500,
+        compaction_cutoff=datetime(2026, 4, 12, 12, 0, tzinfo=UTC),
+        compaction_retention_days=90,
+        retained_compacted_revisions=2_000,
         character_id=character_id,
     )
 
     assert command.retention_result_payload(result) == {
+        "compactedCount": 8,
         "deletedCount": 3,
-        "cutoff": "2026-06-11T12:00:00+00:00",
-        "retentionDays": 30,
-        "retainedContentRevisions": 500,
+        "replayCutoff": "2026-06-11T12:00:00+00:00",
+        "replayRetentionDays": 30,
+        "retainedReplayRevisions": 500,
+        "compactionCutoff": "2026-04-12T12:00:00+00:00",
+        "compactionRetentionDays": 90,
+        "retainedCompactedRevisions": 2_000,
         "characterId": str(character_id),
     }
 

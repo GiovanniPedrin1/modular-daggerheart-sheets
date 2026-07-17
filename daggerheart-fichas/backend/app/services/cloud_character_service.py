@@ -12,6 +12,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
+from app.core.payload_validation import (
+    JsonPayloadValidationError,
+    validate_json_payload,
+)
 from app.models.cloud_character import CloudCharacter
 from app.schemas.characters import (
     CloudCharacterSnapshotInput,
@@ -23,7 +27,10 @@ from app.services.character_patch_service import (
     CharacterPatchError,
     create_character_mutation_diff,
 )
-from app.services.cloud_character_hash import serialize_cloud_character_snapshot
+from app.services.cloud_character_hash import (
+    cloud_character_hash_payload,
+    serialize_cloud_character_snapshot,
+)
 
 type CreateCloudCharacterReason = Literal["existing_identical_snapshot"]
 
@@ -64,6 +71,20 @@ class CloudCharacterTooLargeError(CloudCharacterServiceError):
         super().__init__(
             f"Cloud character snapshot is {actual_bytes} bytes; maximum is {max_bytes}"
         )
+
+
+class InvalidCloudCharacterPayloadError(CloudCharacterServiceError):
+    def __init__(self, error: JsonPayloadValidationError) -> None:
+        self.validation_error = error
+        super().__init__(str(error))
+
+
+class CloudCharacterIdentifierTooLongError(CloudCharacterServiceError):
+    def __init__(self, *, field: str, max_length: int, actual_length: int) -> None:
+        self.field = field
+        self.max_length = max_length
+        self.actual_length = actual_length
+        super().__init__(f"{field} is {actual_length} characters; maximum is {max_length}")
 
 
 class UnsupportedCloudCharacterSchemaVersionError(CloudCharacterServiceError):
@@ -113,6 +134,16 @@ def validate_cloud_character_snapshot(
             supported_version=settings.supported_cloud_character_schema_version,
             received_version=snapshot.schema_version,
         )
+
+    payload = cloud_character_hash_payload(snapshot)
+    try:
+        validate_json_payload(
+            payload,
+            max_depth=settings.max_json_depth,
+            max_string_bytes=settings.max_json_string_length,
+        )
+    except JsonPayloadValidationError as error:
+        raise InvalidCloudCharacterPayloadError(error) from error
 
     canonical_snapshot = serialize_cloud_character_snapshot(snapshot)
     encoded_size = len(canonical_snapshot.encode("utf-8"))
@@ -182,6 +213,20 @@ async def get_owner_cloud_character(
     return character
 
 
+def _validate_transport_identifiers(
+    input_data: CreateCloudCharacterRequest | UpdateCloudCharacterRequest,
+    *,
+    settings: Settings,
+) -> None:
+    device_length = len(input_data.device_id)
+    if device_length > settings.max_device_id_length:
+        raise CloudCharacterIdentifierTooLongError(
+            field="deviceId",
+            max_length=settings.max_device_id_length,
+            actual_length=device_length,
+        )
+
+
 async def create_cloud_character(
     session: AsyncSession,
     *,
@@ -189,6 +234,7 @@ async def create_cloud_character(
     input_data: CreateCloudCharacterRequest,
     settings: Settings,
 ) -> CreateCloudCharacterResult:
+    _validate_transport_identifiers(input_data, settings=settings)
     validated = validate_cloud_character_snapshot(input_data, settings=settings)
     existing = await find_active_cloud_character_by_local_id(
         session,
@@ -265,6 +311,7 @@ async def update_cloud_character(
             received_base_revision=input_data.base_revision,
         )
 
+    _validate_transport_identifiers(input_data, settings=settings)
     validated = validate_cloud_character_snapshot(input_data, settings=settings)
     if character.content_hash == validated.content_hash:
         return UpdateCloudCharacterResult(character=character, unchanged=True)

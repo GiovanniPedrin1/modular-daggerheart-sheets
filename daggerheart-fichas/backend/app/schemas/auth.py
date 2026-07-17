@@ -92,5 +92,11 @@ class CurrentUserResponse(BaseModel):
     user: UserPublic | None
 
 
+class CsrfTokenResponse(BaseModel):
+    csrf_token: str = Field(alias="csrfToken", min_length=32, max_length=512)
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class LogoutResponse(BaseModel):
     ok: bool = True

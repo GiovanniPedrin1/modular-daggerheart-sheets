@@ -27,7 +27,7 @@ def make_request(*, cookie_name: str, token: str | None = None) -> Request:
 @pytest.mark.asyncio
 async def test_require_current_user_returns_authenticated_user(monkeypatch) -> None:
     settings = Settings(app_env="test")
-    request = make_request(cookie_name=settings.session_cookie_name, token="valid-token")
+    request = make_request(cookie_name=settings.effective_session_cookie_name, token="valid-token")
     response = Response()
     session = object()
     user = SimpleNamespace(id="user-id")
@@ -53,7 +53,10 @@ async def test_require_current_user_returns_authenticated_user(monkeypatch) -> N
 @pytest.mark.asyncio
 async def test_require_current_user_clears_cookie_and_rejects_expired_session(monkeypatch) -> None:
     settings = Settings(app_env="test")
-    request = make_request(cookie_name=settings.session_cookie_name, token="expired-token")
+    request = make_request(
+        cookie_name=settings.effective_session_cookie_name,
+        token="expired-token",
+    )
     response = Response()
     monkeypatch.setattr(
         dependencies,
@@ -72,5 +75,5 @@ async def test_require_current_user_clears_cookie_and_rejects_expired_session(mo
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail["code"] == "SESSION_EXPIRED"
     set_cookie = response.headers.get("set-cookie", "")
-    assert settings.session_cookie_name in set_cookie
+    assert settings.effective_session_cookie_name in set_cookie
     assert "Max-Age=0" in set_cookie

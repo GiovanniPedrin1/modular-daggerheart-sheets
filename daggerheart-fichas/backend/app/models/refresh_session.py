@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy import DateTime, ForeignKey, Index, String, func, text
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -16,6 +16,14 @@ if TYPE_CHECKING:
 
 class RefreshSession(Base):
     __tablename__ = "refresh_sessions"
+    __table_args__ = (
+        Index(
+            "idx_refresh_sessions_revoked_at",
+            "revoked_at",
+            "id",
+            postgresql_where=text("revoked_at IS NOT NULL"),
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(
         PostgresUUID(as_uuid=True),

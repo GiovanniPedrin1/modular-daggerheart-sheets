@@ -15,6 +15,7 @@ from app.core.character_mutation_paths import (
     is_character_metadata_mutation_path,
     normalize_character_mutation_path,
 )
+from app.core.security_contracts import MAX_CHARACTER_SERVER_REVISION
 from app.models.character_mutation import CharacterMutation
 from app.models.cloud_character import CloudCharacter
 from app.schemas.characters import CloudCharacterPublic, CloudCharacterSchema
@@ -57,7 +58,7 @@ class CharacterMutationSetOperation(CharacterMutationOperation):
     def require_json_compatible_value(cls, value: Any) -> Any:
         try:
             _canonical_json_bytes(value)
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, RecursionError) as exc:
             raise ValueError("value must contain only JSON-compatible data") from exc
         return value
 
@@ -97,7 +98,7 @@ def _validate_non_overlapping_paths(value: list[str], *, label: str) -> list[str
 
 class CharacterMutationRequest(CharacterSyncSchema):
     mode: Literal["mutation"]
-    base_revision: int = Field(ge=1, alias="baseRevision")
+    base_revision: int = Field(ge=1, le=MAX_CHARACTER_SERVER_REVISION, alias="baseRevision")
     device_id: str = Field(min_length=1, max_length=128, alias="deviceId")
     mutation_id: UUID = Field(alias="mutationId")
     schema_version: int = Field(default=1, ge=1, le=100, alias="schemaVersion")

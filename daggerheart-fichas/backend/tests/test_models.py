@@ -2,6 +2,7 @@ from sqlalchemy import BigInteger, CheckConstraint, Index
 
 from app.db.base import Base
 from app.models import (
+    AuditEvent,
     CharacterEvent,
     CharacterMutation,
     CharacterShare,
@@ -14,6 +15,7 @@ from app.models import (
 
 def test_auth_backup_cloud_character_share_and_event_tables_are_registered() -> None:
     assert User.__tablename__ in Base.metadata.tables
+    assert AuditEvent.__tablename__ in Base.metadata.tables
     assert RefreshSession.__tablename__ in Base.metadata.tables
     assert CloudBackup.__tablename__ in Base.metadata.tables
     assert CloudCharacter.__tablename__ in Base.metadata.tables
@@ -162,6 +164,8 @@ def test_character_event_has_domain_check_constraints() -> None:
 
     assert constraint_names == {
         "ck_character_events_changed_paths_array",
+        "ck_character_events_compacted_event_shape",
+        "ck_character_events_compacted_patch_format",
         "ck_character_events_event_type_supported",
         "ck_character_events_payload_matches_event_type",
         "ck_character_events_server_revision_positive",
@@ -178,6 +182,7 @@ def test_character_event_has_replay_retention_and_uniqueness_indexes() -> None:
         "idx_character_events_character_created",
         "idx_character_events_character_cursor",
         "idx_character_events_character_revision",
+        "idx_character_events_compacted_created",
         "uq_character_events_character_content_revision",
     }
 
@@ -290,4 +295,48 @@ def test_character_mutation_foreign_keys_have_expected_delete_behavior() -> None
     assert foreign_keys == {
         "character_id": ("cloud_characters.id", "CASCADE"),
         "owner_user_id": ("users.id", "CASCADE"),
+    }
+
+
+def test_audit_event_has_minimized_fields_constraints_and_indexes() -> None:
+    table = AuditEvent.__table__
+
+    assert table.c.metadata.type.__class__.__name__ == "JSONB"
+    assert table.c.actor_user_id.nullable is True
+    assert table.c.target_user_id.nullable is True
+    assert table.c.character_id.nullable is True
+    assert table.c.request_id.type.length == 128
+    assert table.c.device_id.type.length == 128
+    assert table.c.client_ip.type.length == 80
+    assert table.c.user_agent.type.length == 512
+
+    constraint_names = {
+        constraint.name
+        for constraint in table.constraints
+        if isinstance(constraint, CheckConstraint)
+    }
+    assert constraint_names == {
+        "ck_audit_events_action_format",
+        "ck_audit_events_metadata_object",
+        "ck_audit_events_outcome_supported",
+        "ck_audit_events_resource_type_format",
+    }
+
+    indexes = {item.name for item in table.indexes if isinstance(item, Index)}
+    assert indexes == {
+        "idx_audit_events_created",
+        "idx_audit_events_action_created",
+        "idx_audit_events_actor_created",
+        "idx_audit_events_character_created",
+        "idx_audit_events_request_id",
+    }
+
+    foreign_keys = {
+        foreign_key.parent.name: (foreign_key.target_fullname, foreign_key.ondelete)
+        for foreign_key in table.foreign_keys
+    }
+    assert foreign_keys == {
+        "actor_user_id": ("users.id", "SET NULL"),
+        "target_user_id": ("users.id", "SET NULL"),
+        "character_id": ("cloud_characters.id", "SET NULL"),
     }

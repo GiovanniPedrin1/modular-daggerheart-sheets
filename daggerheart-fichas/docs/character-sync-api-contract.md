@@ -198,6 +198,17 @@ The current character snapshot is returned so the retry cannot regress the clien
 
 Reusing the same idempotency key with a different request payload returns `422 MUTATION_REJECTED`.
 
+## Concurrent transaction retry
+
+The server may replay the complete mutation transaction after a PostgreSQL serialization failure,
+deadlock, lock timeout, or ambiguous COMMIT acknowledgement. Every replay keeps the original
+`deviceId` and `mutationId`, so a transaction that committed before a connection failure is observed
+as an idempotent duplicate rather than applied twice.
+
+If bounded retries cannot settle the concurrent writes, the endpoint returns `503
+CHARACTER_WRITE_BUSY` with `Retry-After`. The client must retain the same queued mutation and retry it
+later; it must not generate a new `mutationId`.
+
 ## Conflict response
 
 ```json
@@ -275,6 +286,7 @@ Client revision is ahead:
 | 422 | `INVALID_MUTATION` | The operation set or resulting snapshot violates a domain rule. |
 | 422 | `INVALID_CHANGED_PATH` | A path is unsafe, unsupported, too coarse, or inconsistent with operations. |
 | 422 | `MUTATION_REJECTED` | An idempotency key was reused with different mutation content or another permanent rule rejected it. |
+| 503 | `CHARACTER_WRITE_BUSY` | Bounded PostgreSQL concurrency retries were exhausted. Retry the same mutation after `Retry-After`. |
 | 422 | `UNSUPPORTED_CHARACTER_SCHEMA_VERSION` | The mutation schema version is not supported/current for the character. |
 
 FastAPI's standard validation response may also be returned for malformed JSON or field-level type/length errors.

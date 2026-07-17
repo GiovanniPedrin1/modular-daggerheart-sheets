@@ -55,6 +55,12 @@ class CloudCharacter(Base):
             "updated_at",
             postgresql_where=text("deleted_at IS NULL"),
         ),
+        Index(
+            "idx_cloud_characters_deleted_at",
+            "deleted_at",
+            "id",
+            postgresql_where=text("deleted_at IS NOT NULL"),
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(

@@ -463,7 +463,7 @@ def test_http_stream_returns_terminal_resync_and_ends_read_transaction(
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
-    assert response.headers["cache-control"] == "no-cache, no-transform"
+    assert response.headers["cache-control"] == "no-cache, no-store, private, no-transform"
     assert response.headers["x-accel-buffering"] == "no"
     assert "event: character.full_resync_required" in response.text
     assert '"reason":"unknown_cursor"' in response.text

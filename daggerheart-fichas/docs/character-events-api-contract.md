@@ -23,7 +23,9 @@ Successful streams use:
 
 ```http
 Content-Type: text/event-stream
-Cache-Control: no-cache, no-transform
+Cache-Control: no-cache, no-store, private, no-transform
+X-Accel-Buffering: no
+Content-Encoding: identity
 ```
 
 Proxy buffering must be disabled by the deployment when supported.
@@ -68,6 +70,13 @@ data: {"eventId":"1042","characterId":"...","eventType":"updated",...}
 
 The SSE `id` and JSON `eventId` must be identical.
 
+The server also sends a cursor-neutral reconnect directive before the first application event:
+
+```text
+retry: 3000
+
+```
+
 Heartbeats are comments, not application events:
 
 ```text
@@ -75,7 +84,9 @@ Heartbeats are comments, not application events:
 
 ```
 
-Clients must ignore heartbeat comments. Heartbeats do not change the reconnect cursor.
+Clients must ignore heartbeat and rotation comments. These frames do not change the reconnect
+cursor. Long-lived connections are periodically closed after a bounded duration plus jitter; the
+native `EventSource` reconnects with its most recent `Last-Event-ID`.
 
 ## Event types
 
@@ -167,6 +178,13 @@ After receiving this event, the client closes the stream, downloads a fresh snap
 - Event polling happens before access revalidation so a committed `share_revoked` event can be delivered before the stream closes.
 - A client disconnect is checked before opening the next database session. Database failures terminate the response so the browser can reconnect through normal SSE behavior.
 - `X-Accel-Buffering: no` is sent to disable nginx buffering when supported.
+- Query, downstream-send, and connection-lifetime deadlines are bounded by the Phase 6 SSE
+  settings. A timeout closes the response so the browser can reconnect rather than keeping a
+  database pool slot, ASGI task, or proxy write blocked indefinitely.
+- Distributed SSE rate-limit leases refresh in a background task independently from event frames.
+- New streams are rejected with `503 EVENT_STREAM_DRAINING` while the process is draining.
+- The application does not send the HTTP/1.1 hop-by-hop `Connection` header, preserving HTTP/2
+  compatibility.
 
 ## Error codes before streaming starts
 
@@ -175,6 +193,8 @@ After receiving this event, the client closes the stream, downloads a fresh snap
 | 400 | `EVENT_STREAM_POSITION_REQUIRED` | Neither `Last-Event-ID` nor `sinceRevision` was supplied. |
 | 401 | `SESSION_EXPIRED` | The session cookie is absent or invalid. |
 | 404 | `SHARED_CHARACTER_NOT_FOUND` | The viewer cannot access the requested character. |
+| 503 | `EVENT_STREAM_DRAINING` | The process is draining and the browser should retry after restart. |
+| 503 | `EVENT_STREAM_UNAVAILABLE` | Stream preparation exceeded the bounded database timeout. |
 | 422 | FastAPI validation error | `characterId`, `sinceRevision`, or another request value is malformed. |
 
 After the response has switched to `text/event-stream`, recoverable state is communicated through SSE events rather than JSON HTTP errors.
@@ -189,14 +209,25 @@ After the response has switched to `text/event-stream`, recoverable state is com
 - collaborative editing;
 - guarantees that already viewed data can be erased from a viewer's device.
 
-## Retention execution
+## Retention and compaction execution
 
-Persisted events use a dual retention rule:
+Persisted events use two independent windows:
 
-- every event newer than `CHARACTER_EVENT_RETENTION_DAYS` is preserved;
-- the newest `CHARACTER_EVENT_RETENTION_REVISIONS` content events (`updated` or
-  `deleted`) for each character are preserved even when older than the age window;
-- targeted `share_revoked` events use the age window only.
+- **public replay window**: every replayable snapshot/deletion event newer than
+  `CHARACTER_EVENT_RETENTION_DAYS` is preserved, together with at least the newest
+  `CHARACTER_EVENT_RETENTION_REVISIONS` content revisions per character;
+- **merge-history window**: update snapshots that leave the replay window and contain exact
+  `changed_paths` are compacted in place to `patch = {"format":"changed_paths_v1"}` with
+  `snapshot = NULL`; these smaller rows are kept for
+  `CHARACTER_EVENT_COMPACTION_RETENTION_DAYS` and at least the newest
+  `CHARACTER_EVENT_COMPACTION_RETENTION_REVISIONS` mergeable revisions;
+- legacy updates without `changed_paths`, deletion events and targeted `share_revoked` events
+  cannot be compacted and are deleted after their public replay window.
+
+Compacted rows are internal. They are excluded from revision replay, cursor validation and live
+SSE polling, but remain visible to the owner mutation merge service. Therefore an old viewer cursor
+receives `character.full_resync_required`, while an owner mutation based on the same revision may
+still merge safely if every intervening path summary remains available.
 
 Run one maintenance pass from the backend environment with either command:
 
@@ -212,11 +243,11 @@ An optional character can be targeted for diagnostics:
 prune-character-events --character-id 00000000-0000-0000-0000-000000000000
 ```
 
-The command commits one transaction and prints a JSON summary containing the cutoff and
-number of deleted rows. Production scheduling is deployment-specific; running this command
-once per day is sufficient for the default 30-day policy.
+The command commits one transaction and prints a JSON summary with compacted/deleted row counts and
+both cutoffs. Production scheduling is deployment-specific; running it once per day is sufficient
+for the default policy.
 
-Retention can race with a long paginated replay. If an already-delivered replay cursor or a
-required revision disappears before the next page is loaded, the server emits
-`character.full_resync_required` and terminates the stream instead of silently skipping data.
-The event never contains an SSE `id`, so clients must fetch a fresh snapshot before reconnecting.
+Retention can race with a long paginated replay. If an already-delivered replay cursor or required
+snapshot disappears before the next page is loaded, the server emits
+`character.full_resync_required` and terminates the stream instead of silently skipping data. The
+event never contains an SSE `id`, so clients must fetch a fresh snapshot before reconnecting.

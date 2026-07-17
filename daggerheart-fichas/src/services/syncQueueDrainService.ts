@@ -139,12 +139,14 @@ export function getNextSyncQueueAttemptAt(records: SyncQueueRecord[]) {
 export function calculateSyncRetryAt(
   retryCount: number,
   now: Date = new Date(),
+  minimumDelayMs = 0,
 ) {
   const safeRetryCount = Math.max(0, Math.floor(retryCount));
-  const delay = Math.min(
+  const exponentialDelay = Math.min(
     SYNC_RETRY_BASE_DELAY_MS * 2 ** safeRetryCount,
     SYNC_RETRY_MAX_DELAY_MS,
   );
+  const delay = Math.max(exponentialDelay, Math.max(0, minimumDelayMs));
 
   return new Date(now.getTime() + delay).toISOString();
 }
@@ -307,7 +309,13 @@ export function createSyncQueueDrainWorker(
         }
 
         if (isRetryableError(error)) {
-          const nextAttemptAt = calculateSyncRetryAt(record.retryCount, now);
+          const retryAfterMs =
+            error instanceof ApiClientError ? error.retryAfterMs ?? 0 : 0;
+          const nextAttemptAt = calculateSyncRetryAt(
+            record.retryCount,
+            now,
+            retryAfterMs,
+          );
           await dependencies.markErrored(record.id, {
             status: "failed",
             lastErrorCode: errorCode,

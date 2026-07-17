@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import and_, delete, func, or_, select
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
+from app.core.observability import Stopwatch, get_current_metrics, log_event
 from app.models.character_event import CharacterEvent
 from app.models.cloud_character import CloudCharacter
 from app.schemas.character_events import (
@@ -20,6 +22,10 @@ from app.schemas.character_events import (
 )
 
 CONTENT_EVENT_TYPES = ("updated", "deleted")
+COMPACTED_EVENT_PATCH_FORMAT = "changed_paths_v1"
+COMPACTED_EVENT_PATCH = {"format": COMPACTED_EVENT_PATCH_FORMAT}
+
+logger = logging.getLogger(__name__)
 
 
 class CharacterEventServiceError(Exception):
@@ -93,12 +99,16 @@ class CharacterEventHistoryState:
 
 @dataclass(frozen=True, slots=True)
 class CharacterEventRetentionResult:
-    """Summary returned by one committed retention run."""
+    """Summary returned by one committed retention/compaction run."""
 
+    compacted_count: int
     deleted_count: int
     cutoff: datetime
     retention_days: int
     retained_content_revisions: int
+    compaction_cutoff: datetime
+    compaction_retention_days: int
+    retained_compacted_revisions: int
     character_id: UUID | None
 
 
@@ -109,12 +119,55 @@ def _normalize_batch_size(limit: int) -> int:
 
 
 def _content_event_predicate():
+    """All content revisions, including path-only compacted updates."""
+
     return CharacterEvent.event_type.in_(CONTENT_EVENT_TYPES)
+
+
+def _replayable_content_event_predicate():
+    """Content rows that can be serialized to the public snapshot SSE contract."""
+
+    return or_(
+        and_(
+            CharacterEvent.event_type == "updated",
+            CharacterEvent.snapshot.is_not(None),
+        ),
+        CharacterEvent.event_type == "deleted",
+    )
+
+
+def _merge_history_event_predicate():
+    """Update revisions with exact paths, whether snapshot or compacted."""
+
+    return and_(
+        CharacterEvent.event_type == "updated",
+        CharacterEvent.changed_paths.is_not(None),
+    )
+
+
+def _compacted_content_event_predicate():
+    return and_(
+        CharacterEvent.event_type == "updated",
+        CharacterEvent.snapshot.is_(None),
+        CharacterEvent.patch.is_not(None),
+        CharacterEvent.compacted_at.is_not(None),
+        CharacterEvent.changed_paths.is_not(None),
+    )
+
+
+def is_compacted_character_event(event: CharacterEvent) -> bool:
+    return (
+        event.event_type == "updated"
+        and event.snapshot is None
+        and event.patch == COMPACTED_EVENT_PATCH
+        and event.compacted_at is not None
+        and bool(event.changed_paths)
+    )
 
 
 def _viewer_visible_event_predicate(viewer_user_id: UUID):
     return or_(
-        _content_event_predicate(),
+        _replayable_content_event_predicate(),
         and_(
             CharacterEvent.event_type == "share_revoked",
             CharacterEvent.audience_user_id == viewer_user_id,
@@ -208,11 +261,11 @@ async def get_character_event_history_state(
     after_revision: int | None = None,
     through_revision: int | None = None,
 ) -> CharacterEventHistoryState:
-    """Return aggregate availability metadata for persisted content events."""
+    """Return availability metadata for public replayable content events."""
 
     conditions = [
         CharacterEvent.character_id == character_id,
-        _content_event_predicate(),
+        _replayable_content_event_predicate(),
     ]
     if after_revision is not None:
         conditions.append(CharacterEvent.server_revision > after_revision)
@@ -244,6 +297,22 @@ async def get_oldest_available_revision(
         character_id=character_id,
     )
     return state.oldest_available_revision
+
+
+async def get_oldest_mergeable_revision(
+    session: AsyncSession,
+    *,
+    character_id: UUID,
+) -> int | None:
+    """Return the oldest update revision that still has exact path metadata."""
+
+    result = await session.execute(
+        select(func.min(CharacterEvent.server_revision)).where(
+            CharacterEvent.character_id == character_id,
+            _merge_history_event_predicate(),
+        )
+    )
+    return result.scalar_one_or_none()
 
 
 async def has_character_event_history_gap(
@@ -316,7 +385,7 @@ async def list_character_content_events_since_revision(
         select(CharacterEvent)
         .where(
             CharacterEvent.character_id == character_id,
-            _content_event_predicate(),
+            _replayable_content_event_predicate(),
             CharacterEvent.server_revision > since_revision,
             CharacterEvent.server_revision <= current_server_revision,
         )
@@ -366,7 +435,7 @@ async def list_character_content_events_after_position(
         .where(
             CharacterEvent.character_id == character_id,
             CharacterEvent.id > after_event_id,
-            _content_event_predicate(),
+            _replayable_content_event_predicate(),
         )
         .order_by(CharacterEvent.id.asc())
         .limit(batch_size + 1)
@@ -389,7 +458,7 @@ async def is_character_content_event_cursor_available(
         .where(
             CharacterEvent.id == event_id,
             CharacterEvent.character_id == character_id,
-            _content_event_predicate(),
+            _replayable_content_event_predicate(),
         )
         .limit(1)
     )
@@ -550,21 +619,18 @@ async def list_character_events_after_cursor(
     )
 
 
-async def delete_expired_character_events(
+async def compact_expired_character_events(
     session: AsyncSession,
     *,
     settings: Settings,
     now: datetime | None = None,
     character_id: UUID | None = None,
 ) -> int:
-    """Delete old events while retaining recent content revisions per character.
+    """Replace expired replay snapshots with small, merge-safe path summaries.
 
-    Events are removed only when they are older than the age cutoff. In addition,
-    the newest configured number of ``updated``/``deleted`` events for each
-    character are kept regardless of age. Viewer-specific revocation events follow
-    the age policy because they do not represent content revision history.
-
-    The caller owns the transaction and decides when to commit.
+    Only update rows with validated ``changed_paths`` can be compacted. Legacy
+    snapshot-only barriers and deletion events remain replay rows until the deletion
+    phase removes them. The caller owns the transaction.
     """
 
     current_time = now or datetime.now(UTC)
@@ -572,11 +638,11 @@ async def delete_expired_character_events(
         raise ValueError("retention time must include a timezone")
 
     cutoff = current_time - timedelta(days=settings.character_event_retention_days)
-    ranked_conditions = [_content_event_predicate()]
+    ranked_conditions = [_replayable_content_event_predicate()]
     if character_id is not None:
         ranked_conditions.append(CharacterEvent.character_id == character_id)
 
-    ranked_content_events = (
+    ranked_replay_events = (
         select(
             CharacterEvent.id.label("event_id"),
             func.row_number()
@@ -592,20 +658,141 @@ async def delete_expired_character_events(
         .where(*ranked_conditions)
         .subquery()
     )
-    retained_content_ids = select(ranked_content_events.c.event_id).where(
-        ranked_content_events.c.retention_rank
-        <= settings.character_event_retention_revisions
+    expired_replay_ids = select(ranked_replay_events.c.event_id).where(
+        ranked_replay_events.c.retention_rank
+        > settings.character_event_retention_revisions
     )
 
-    delete_conditions = [
+    conditions = [
+        CharacterEvent.id.in_(expired_replay_ids),
         CharacterEvent.created_at < cutoff,
-        CharacterEvent.id.not_in(retained_content_ids),
+        CharacterEvent.event_type == "updated",
+        CharacterEvent.snapshot.is_not(None),
+        CharacterEvent.patch.is_(None),
+        CharacterEvent.changed_paths.is_not(None),
     ]
     if character_id is not None:
-        delete_conditions.append(CharacterEvent.character_id == character_id)
+        conditions.append(CharacterEvent.character_id == character_id)
 
-    result = await session.execute(delete(CharacterEvent).where(*delete_conditions))
+    result = await session.execute(
+        update(CharacterEvent)
+        .where(*conditions)
+        .values(
+            snapshot=None,
+            patch=COMPACTED_EVENT_PATCH,
+            compacted_at=current_time,
+        )
+    )
     return int(result.rowcount or 0)
+
+
+async def delete_expired_character_events(
+    session: AsyncSession,
+    *,
+    settings: Settings,
+    now: datetime | None = None,
+    character_id: UUID | None = None,
+) -> int:
+    """Delete events after their replay or compacted-history window expires.
+
+    Public snapshots and deletion/revocation events use the shorter replay window.
+    Path-only compacted updates use the longer merge-history window, preserving exact
+    per-revision ``changed_paths`` without retaining full character snapshots.
+    """
+
+    current_time = now or datetime.now(UTC)
+    if current_time.tzinfo is None or current_time.utcoffset() is None:
+        raise ValueError("retention time must include a timezone")
+
+    replay_cutoff = current_time - timedelta(days=settings.character_event_retention_days)
+    compaction_cutoff = current_time - timedelta(
+        days=settings.character_event_compaction_retention_days
+    )
+
+    replay_rank_conditions = [_replayable_content_event_predicate()]
+    merge_rank_conditions = [_merge_history_event_predicate()]
+    if character_id is not None:
+        character_filter = CharacterEvent.character_id == character_id
+        replay_rank_conditions.append(character_filter)
+        merge_rank_conditions.append(character_filter)
+
+    ranked_replay_events = (
+        select(
+            CharacterEvent.id.label("event_id"),
+            func.row_number()
+            .over(
+                partition_by=CharacterEvent.character_id,
+                order_by=(
+                    CharacterEvent.server_revision.desc(),
+                    CharacterEvent.id.desc(),
+                ),
+            )
+            .label("retention_rank"),
+        )
+        .where(*replay_rank_conditions)
+        .subquery()
+    )
+    expired_replay_ids = select(ranked_replay_events.c.event_id).where(
+        ranked_replay_events.c.retention_rank
+        > settings.character_event_retention_revisions
+    )
+
+    ranked_merge_events = (
+        select(
+            CharacterEvent.id.label("event_id"),
+            func.row_number()
+            .over(
+                partition_by=CharacterEvent.character_id,
+                order_by=(
+                    CharacterEvent.server_revision.desc(),
+                    CharacterEvent.id.desc(),
+                ),
+            )
+            .label("retention_rank"),
+        )
+        .where(*merge_rank_conditions)
+        .subquery()
+    )
+    retained_merge_ids = select(ranked_merge_events.c.event_id).where(
+        ranked_merge_events.c.retention_rank
+        <= settings.character_event_compaction_retention_revisions
+    )
+
+    expired_targeted_event = and_(
+        CharacterEvent.event_type == "share_revoked",
+        CharacterEvent.created_at < replay_cutoff,
+    )
+    expired_uncompactable_replay_event = and_(
+        CharacterEvent.id.in_(expired_replay_ids),
+        CharacterEvent.created_at < replay_cutoff,
+        or_(
+            CharacterEvent.event_type == "deleted",
+            and_(
+                CharacterEvent.event_type == "updated",
+                CharacterEvent.snapshot.is_not(None),
+                CharacterEvent.changed_paths.is_(None),
+            ),
+        ),
+    )
+    expired_compacted_event = and_(
+        _compacted_content_event_predicate(),
+        CharacterEvent.created_at < compaction_cutoff,
+        CharacterEvent.id.not_in(retained_merge_ids),
+    )
+
+    conditions = [
+        or_(
+            expired_targeted_event,
+            expired_uncompactable_replay_event,
+            expired_compacted_event,
+        )
+    ]
+    if character_id is not None:
+        conditions.append(CharacterEvent.character_id == character_id)
+
+    result = await session.execute(delete(CharacterEvent).where(*conditions))
+    return int(result.rowcount or 0)
+
 
 async def prune_character_events(
     session: AsyncSession,
@@ -614,29 +801,62 @@ async def prune_character_events(
     now: datetime | None = None,
     character_id: UUID | None = None,
 ) -> CharacterEventRetentionResult:
-    """Apply the configured retention policy in the caller's transaction.
+    """Compact replay-expired snapshots, then prune expired compacted rows.
 
-    The operation keeps every event inside the age window and also preserves the
-    newest configured number of content revisions per character. Targeted
-    ``share_revoked`` events are retained by age only. The caller remains responsible
-    for committing or rolling back the transaction.
+    The operation is idempotent and runs entirely in the caller's transaction. A
+    concurrent long replay either completes from still-replayable rows or detects a
+    gap and receives ``full_resync_required``; patch-only rows are never exposed over
+    SSE. Owner mutation merge checks can continue using compacted path metadata until
+    the longer compaction window also expires.
     """
 
     current_time = now or datetime.now(UTC)
     if current_time.tzinfo is None or current_time.utcoffset() is None:
         raise ValueError("retention time must include a timezone")
 
+    stopwatch = Stopwatch.start()
+    compacted_count = await compact_expired_character_events(
+        session,
+        settings=settings,
+        now=current_time,
+        character_id=character_id,
+    )
     deleted_count = await delete_expired_character_events(
         session,
         settings=settings,
         now=current_time,
         character_id=character_id,
     )
-    return CharacterEventRetentionResult(
+    result = CharacterEventRetentionResult(
+        compacted_count=compacted_count,
         deleted_count=deleted_count,
         cutoff=current_time - timedelta(days=settings.character_event_retention_days),
         retention_days=settings.character_event_retention_days,
         retained_content_revisions=settings.character_event_retention_revisions,
+        compaction_cutoff=current_time
+        - timedelta(days=settings.character_event_compaction_retention_days),
+        compaction_retention_days=settings.character_event_compaction_retention_days,
+        retained_compacted_revisions=(
+            settings.character_event_compaction_retention_revisions
+        ),
         character_id=character_id,
     )
+
+    duration_seconds = stopwatch.elapsed()
+    metrics = get_current_metrics()
+    metrics.record_character_event_maintenance(
+        compacted_count=compacted_count,
+        deleted_count=deleted_count,
+        duration_seconds=duration_seconds,
+    )
+    log_event(
+        logger,
+        logging.INFO,
+        "character.events.maintenance.completed",
+        compactedCount=compacted_count,
+        deletedCount=deleted_count,
+        targeted=character_id is not None,
+        durationMs=round(duration_seconds * 1000, 3),
+    )
+    return result
 

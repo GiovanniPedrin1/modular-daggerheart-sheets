@@ -553,3 +553,11 @@ def test_factories_reject_incomplete_persisted_records() -> None:
 def test_mutation_too_large_detail_requires_actual_size_to_exceed_limit() -> None:
     with pytest.raises(ValidationError, match="must exceed"):
         CharacterMutationTooLargeDetail(maxBytes=1024, actualBytes=1024)
+
+
+def test_mutation_request_rejects_revision_outside_postgresql_integer_range() -> None:
+    payload = make_request()
+    payload["baseRevision"] = 2_147_483_648
+
+    with pytest.raises(ValidationError):
+        CharacterMutationRequest.model_validate(payload)

@@ -1,13 +1,16 @@
+import logging
 from datetime import UTC, datetime
 
 from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.core.config import get_settings
+from app.core.observability import log_event
 from app.db.session import ping_database
 
 router = APIRouter(tags=["health"])
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 class HealthResponse(BaseModel):
@@ -40,12 +43,18 @@ async def health_check() -> HealthResponse:
 async def database_health_check() -> DatabaseHealthResponse:
     try:
         await ping_database()
-    except Exception as exc:  # noqa: BLE001 - health endpoint should report unexpected DB errors.
+    except Exception:  # noqa: BLE001 - health must convert all DB failures safely.
+        log_event(
+            logger,
+            logging.ERROR,
+            "health.database.failed",
+            exc_info=True,
+        )
         return DatabaseHealthResponse(
             status="error",
             database="postgresql",
             checked_at=datetime.now(UTC),
-            error=str(exc),
+            error="database_unavailable",
         )
 
     return DatabaseHealthResponse(

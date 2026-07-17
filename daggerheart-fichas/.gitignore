@@ -27,3 +27,11 @@ dist-ssr
 coverage
 playwright-report
 test-results
+
+# Python/backend artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+backend/.venv/
+backend/.pytest_cache/
+backend/.ruff_cache/

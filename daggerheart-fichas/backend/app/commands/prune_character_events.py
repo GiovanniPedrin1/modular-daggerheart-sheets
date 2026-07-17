@@ -34,8 +34,8 @@ def _parse_timestamp(value: str) -> datetime:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Delete expired character realtime events while retaining the newest "
-            "configured content revisions."
+            "Compact replay-expired character snapshots and delete event history "
+            "after its configured retention windows."
         )
     )
     parser.add_argument(
@@ -55,10 +55,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 def retention_result_payload(result: CharacterEventRetentionResult) -> dict[str, Any]:
     return {
+        "compactedCount": result.compacted_count,
         "deletedCount": result.deleted_count,
-        "cutoff": result.cutoff.isoformat(),
-        "retentionDays": result.retention_days,
-        "retainedContentRevisions": result.retained_content_revisions,
+        "replayCutoff": result.cutoff.isoformat(),
+        "replayRetentionDays": result.retention_days,
+        "retainedReplayRevisions": result.retained_content_revisions,
+        "compactionCutoff": result.compaction_cutoff.isoformat(),
+        "compactionRetentionDays": result.compaction_retention_days,
+        "retainedCompactedRevisions": result.retained_compacted_revisions,
         "characterId": str(result.character_id) if result.character_id else None,
     }
 

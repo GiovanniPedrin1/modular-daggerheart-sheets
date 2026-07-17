@@ -297,7 +297,7 @@ async def test_load_remote_changed_paths_requires_contiguous_revisions(monkeypat
     session.execute.return_value = scalar_list_result([event])
     monkeypatch.setattr(
         service.event_service,
-        "get_oldest_available_revision",
+        "get_oldest_mergeable_revision",
         AsyncMock(return_value=4),
     )
 
@@ -342,7 +342,7 @@ async def test_load_remote_changed_paths_deduplicates_and_normalizes_history(mon
     session.execute.return_value = scalar_list_result(events)
     monkeypatch.setattr(
         service.event_service,
-        "get_oldest_available_revision",
+        "get_oldest_mergeable_revision",
         AsyncMock(return_value=3),
     )
 
@@ -354,4 +354,38 @@ async def test_load_remote_changed_paths_deduplicates_and_normalizes_history(mon
     )
 
     assert history.changed_paths == ("/data/hp_current", "/data/gold")
+    assert history.oldest_available_revision == 3
+
+
+@pytest.mark.asyncio
+async def test_load_remote_changed_paths_accepts_compacted_path_only_event(monkeypatch) -> None:
+    character_id = uuid4()
+    session = make_session()
+    compacted = CharacterEvent(
+        character_id=character_id,
+        server_revision=3,
+        event_type="updated",
+        snapshot=None,
+        patch={"format": "changed_paths_v1"},
+        compacted_at=FIXED_TIME,
+        changed_paths=["/data/hp_current"],
+        actor_user_id=uuid4(),
+        device_id="device-web",
+        created_at=FIXED_TIME,
+    )
+    session.execute.return_value = scalar_list_result([compacted])
+    monkeypatch.setattr(
+        service.event_service,
+        "get_oldest_mergeable_revision",
+        AsyncMock(return_value=3),
+    )
+
+    history = await service.load_remote_changed_paths(
+        session,
+        character_id=character_id,
+        base_revision=2,
+        server_revision=3,
+    )
+
+    assert history.changed_paths == ("/data/hp_current",)
     assert history.oldest_available_revision == 3

@@ -381,5 +381,5 @@ def test_missing_session_returns_contract_error_and_expires_cookie(monkeypatch) 
         "detail": None,
     }
     set_cookie = response.headers.get("set-cookie", "")
-    assert settings.session_cookie_name in set_cookie
+    assert settings.effective_session_cookie_name in set_cookie
     assert "Max-Age=0" in set_cookie

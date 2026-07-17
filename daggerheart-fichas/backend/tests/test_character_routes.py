@@ -112,6 +112,7 @@ async def test_create_route_commits_new_character_and_returns_created(monkeypatc
         session=session,
         settings=Settings(app_env="test"),
         current_user=owner,
+        request=SimpleNamespace(state=SimpleNamespace(request_body_bytes=0)),
     )
 
     assert response.status_code == status.HTTP_201_CREATED
@@ -147,6 +148,7 @@ async def test_create_route_returns_200_for_idempotent_retry_without_commit(monk
         session=session,
         settings=Settings(app_env="test"),
         current_user=owner,
+        request=SimpleNamespace(state=SimpleNamespace(request_body_bytes=0)),
     )
 
     assert response.status_code == status.HTTP_200_OK
@@ -211,6 +213,7 @@ async def test_update_route_commits_each_locked_update_and_refreshes_changed_sna
         session=session,
         settings=Settings(app_env="test"),
         current_user=owner,
+        request=SimpleNamespace(state=SimpleNamespace(request_body_bytes=0)),
     )
     unchanged = await routes.update_cloud_character(
         character_id=unchanged_character.id,
@@ -218,6 +221,7 @@ async def test_update_route_commits_each_locked_update_and_refreshes_changed_sna
         session=session,
         settings=Settings(app_env="test"),
         current_user=owner,
+        request=SimpleNamespace(state=SimpleNamespace(request_body_bytes=0)),
     )
 
     assert changed.unchanged is False
@@ -244,6 +248,7 @@ async def test_delete_route_commits_soft_delete(monkeypatch) -> None:
     result = await routes.delete_cloud_character(
         character_id=character_id,
         session=session,
+        settings=Settings(app_env="test"),
         current_user=owner,
     )
 
@@ -302,9 +307,7 @@ def test_existing_character_and_revision_errors_include_reconciliation_details()
     character = make_character(server_revision=3)
 
     with pytest.raises(HTTPException) as existing_exc:
-        routes.raise_cloud_character_api_error(
-            service.CloudCharacterAlreadyExistsError(character)
-        )
+        routes.raise_cloud_character_api_error(service.CloudCharacterAlreadyExistsError(character))
 
     assert existing_exc.value.status_code == status.HTTP_409_CONFLICT
     assert existing_exc.value.detail == {
@@ -332,3 +335,27 @@ def test_existing_character_and_revision_errors_include_reconciliation_details()
         "serverRevision": 3,
         "receivedBaseRevision": 1,
     }
+
+
+@pytest.mark.asyncio
+async def test_create_route_rejects_wire_body_above_character_limit(monkeypatch) -> None:
+    owner = SimpleNamespace(id=uuid4())
+    create_mock = AsyncMock()
+    monkeypatch.setattr(routes.character_service, "create_cloud_character", create_mock)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await routes.create_cloud_character(
+            input_data=make_create_request(),
+            response=Response(),
+            session=make_session(),
+            settings=Settings(
+                app_env="test",
+                max_cloud_character_payload_bytes=128,
+            ),
+            current_user=owner,
+            request=SimpleNamespace(state=SimpleNamespace(request_body_bytes=129)),
+        )
+
+    assert exc_info.value.status_code == 413
+    assert exc_info.value.detail["code"] == "CHARACTER_TOO_LARGE"
+    create_mock.assert_not_awaited()

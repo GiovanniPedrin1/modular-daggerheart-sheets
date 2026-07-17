@@ -5,13 +5,20 @@ import json
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import CurrentUser, DbSession, SettingsDep
 from app.api.errors import api_error
+from app.api.payload_limits import enforce_feature_request_body_limit
+from app.api.rate_limits import (
+    enforce_user_read_rate_limit,
+    enforce_user_write_rate_limit,
+)
+from app.core import audit_actions
 from app.core.config import Settings
+from app.core.payload_validation import JsonPayloadValidationError, validate_json_payload
 from app.models.cloud_backup import CloudBackup
 from app.models.user import User
 from app.schemas.backups import (
@@ -23,6 +30,7 @@ from app.schemas.backups import (
     GetBackupResponse,
     ListBackupsResponse,
 )
+from app.services import audit_service
 
 router = APIRouter(prefix="/backups", tags=["backups"])
 
@@ -33,6 +41,7 @@ def stable_json_dumps(value: Any) -> str:
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
+        allow_nan=False,
     )
 
 
@@ -51,6 +60,32 @@ def validate_backup_payload(
 ) -> dict[str, Any]:
     storage_payload = cloud_payload_to_storage(input_data)
     normalized_inner_payload = input_data.payload.model_dump(by_alias=True, mode="json")
+
+    if len(input_data.device_id) > settings.max_device_id_length:
+        raise api_error(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "INVALID_BACKUP_PAYLOAD",
+            "Cloud backup deviceId exceeds the configured limit.",
+            {
+                "path": "/deviceId",
+                "maxLength": settings.max_device_id_length,
+                "actualLength": len(input_data.device_id),
+            },
+        )
+
+    try:
+        validate_json_payload(
+            storage_payload,
+            max_depth=settings.max_json_depth,
+            max_string_bytes=settings.max_json_string_length,
+        )
+    except JsonPayloadValidationError as error:
+        raise api_error(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "INVALID_BACKUP_PAYLOAD",
+            "Cloud backup contains an unsupported or excessive JSON value.",
+            error.public_detail(),
+        ) from error
 
     encoded_size = len(stable_json_dumps(storage_payload).encode("utf-8"))
     if encoded_size > settings.max_cloud_backup_payload_bytes:
@@ -83,9 +118,8 @@ def validate_backup_payload(
             },
         )
 
-    if (
-        not isinstance(input_data.payload.characters, list)
-        or not isinstance(input_data.payload.settings, list)
+    if not isinstance(input_data.payload.characters, list) or not isinstance(
+        input_data.payload.settings, list
     ):
         raise api_error(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -160,13 +194,25 @@ async def prune_old_backups(session: AsyncSession, *, user: User, retention_limi
         )
 
 
-@router.post("", response_model=CreateBackupResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=CreateBackupResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(enforce_user_write_rate_limit)],
+)
 async def create_backup(
+    request: Request,
     input_data: CloudBackupPayload,
     session: DbSession,
     settings: SettingsDep,
     current_user: CurrentUser,
 ) -> CreateBackupResponse:
+    enforce_feature_request_body_limit(
+        request,
+        max_bytes=settings.max_cloud_backup_payload_bytes,
+        code="BACKUP_TOO_LARGE",
+        message="Cloud backup request body is too large.",
+    )
     storage_payload = validate_backup_payload(input_data, settings=settings)
     latest_backup = await find_latest_backup_for_user(session, current_user)
 
@@ -194,13 +240,31 @@ async def create_backup(
         user=current_user,
         retention_limit=settings.cloud_backup_retention_limit,
     )
+    await audit_service.append_audit_event(
+        session,
+        action=audit_actions.BACKUP_CREATED,
+        actor_user_id=current_user.id,
+        resource_type="cloud_backup",
+        resource_id=backup.id,
+        device_id=input_data.device_id,
+        metadata={
+            "characterCount": backup.character_count,
+            "settingCount": backup.setting_count,
+            "cloudFormatVersion": backup.cloud_format_version,
+        },
+        settings=settings,
+    )
     await session.commit()
     await session.refresh(backup)
 
     return CreateBackupResponse(backup=to_public_backup(backup))
 
 
-@router.get("", response_model=ListBackupsResponse)
+@router.get(
+    "",
+    response_model=ListBackupsResponse,
+    dependencies=[Depends(enforce_user_read_rate_limit)],
+)
 async def list_backups(
     session: DbSession,
     current_user: CurrentUser,
@@ -214,7 +278,11 @@ async def list_backups(
     return ListBackupsResponse(backups=backups)
 
 
-@router.get("/latest", response_model=GetBackupResponse)
+@router.get(
+    "/latest",
+    response_model=GetBackupResponse,
+    dependencies=[Depends(enforce_user_read_rate_limit)],
+)
 async def get_latest_backup(
     session: DbSession,
     current_user: CurrentUser,
@@ -230,7 +298,11 @@ async def get_latest_backup(
     return GetBackupResponse(backup=to_backup_with_payload(backup))
 
 
-@router.get("/{backup_id}", response_model=GetBackupResponse)
+@router.get(
+    "/{backup_id}",
+    response_model=GetBackupResponse,
+    dependencies=[Depends(enforce_user_read_rate_limit)],
+)
 async def get_backup(
     backup_id: UUID,
     session: DbSession,
@@ -247,7 +319,11 @@ async def get_backup(
     return GetBackupResponse(backup=to_backup_with_payload(backup))
 
 
-@router.delete("/{backup_id}", response_model=DeleteBackupResponse)
+@router.delete(
+    "/{backup_id}",
+    response_model=DeleteBackupResponse,
+    dependencies=[Depends(enforce_user_write_rate_limit)],
+)
 async def delete_backup(
     backup_id: UUID,
     session: DbSession,
@@ -262,5 +338,14 @@ async def delete_backup(
         )
 
     await session.delete(backup)
+    await audit_service.append_audit_event(
+        session,
+        action=audit_actions.BACKUP_DELETED,
+        actor_user_id=current_user.id,
+        resource_type="cloud_backup",
+        resource_id=backup.id,
+        device_id=backup.device_id,
+        metadata={"cloudFormatVersion": backup.cloud_format_version},
+    )
     await session.commit()
     return DeleteBackupResponse(ok=True)
