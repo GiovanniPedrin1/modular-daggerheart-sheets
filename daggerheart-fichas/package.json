@@ -1,7 +1,7 @@
 {
   "name": "daggerheart-fichas",
   "private": true,
-  "version": "2.5.2-dev",
+  "version": "2.5.2-prod",
   "type": "module",
   "scripts": {
     "dev": "vite",
